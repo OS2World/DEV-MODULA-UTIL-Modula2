@@ -1,0 +1,78 @@
+DEFINITION MODULE ComplexLib;
+
+(**************************************************************************
+  OS/2 2.x  Modula-2 complex number library
+
+            Aug 16, 1995 -- Created.
+
+  Copyright (c) 1995 by Anthony Busigin. Permission is granted for
+  use of this software with the Modula-2 OS/2-compiler by Juergen Neuhoff.
+
+  Note: This library is a work in progress. SHORTCOMPLEX functions will
+        be added in a future version of the library.
+**************************************************************************)
+
+TYPE
+  COMPLEX = RECORD
+    r,i : REAL;
+  END;
+
+  SHORTCOMPLEX = RECORD
+    r,i : SHORTREAL;
+  END;
+
+  LONGCOMPLEX = RECORD
+    r,i : LONGREAL;
+  END;
+
+PROCEDURE cadd( x, y : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns x+y *)
+
+PROCEDURE csub( x, y : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns x-y *)
+
+PROCEDURE cmul( x, y : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns x*y *)
+
+PROCEDURE rcmul ( a : LONGREAL;  x: LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns a*x *)
+
+PROCEDURE cdiv( x, y : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns x/y *)
+
+PROCEDURE cdivr ( x: LONGCOMPLEX; a : LONGREAL ) : LONGCOMPLEX;
+(* returns x/a *)
+
+PROCEDURE csqr( x : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns x*x *)
+
+PROCEDURE csqrt( x : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns complex square root of x *)
+
+PROCEDURE lcmplx( r, i : LONGREAL ) : LONGCOMPLEX;
+(* returns complex number *)
+
+PROCEDURE cmag( x : LONGCOMPLEX ) : LONGREAL;
+(* returns magnitude of x = sqrt(x.r*x.r+x.i*x.i) *)
+
+PROCEDURE conjg ( x : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns complex conjugate of x *)
+
+PROCEDURE cexp ( x : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns complex exp(x) *)
+
+PROCEDURE cln ( x : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns complex ln(x) *)
+
+PROCEDURE csin ( x : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns complex sin(x) *)
+
+PROCEDURE ccos ( x : LONGCOMPLEX ) : LONGCOMPLEX;
+(* returns complex cos(x) *)
+
+PROCEDURE WriteLongComplex( x : LONGCOMPLEX; n : INTEGER );
+(* write complex number x *)
+
+END ComplexLib.
+
+

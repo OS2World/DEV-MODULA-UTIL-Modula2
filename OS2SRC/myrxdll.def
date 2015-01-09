@@ -1,0 +1,55 @@
+(*$DLL *)
+DEFINITION MODULE MyRxDLL;
+
+(**************************************************************************
+  OS/2 2.x/Warp  Modula-2 sample REXX-DLL.
+
+  Copyright (c) 1995 by Anthony Busigin. 
+**************************************************************************)
+
+TYPE
+   STRING   = ARRAY[0..254] OF CHAR;
+   PSTRING  = POINTER TO STRING;
+   RXSTRING = RECORD
+                strlen : LONGCARD;
+                strptr : PSTRING;
+              END;
+
+   PRXSTRING = POINTER TO RXSTRING;
+
+(*$CDECL+*)
+
+(*-------------------------------------------------------------------*)
+(* REXX procedure to call DosSleep function for a specfied duration  *)
+(* in milliseconds.                                                  *)
+(* Usage: CALL RxDelay 100                                           *)
+(*-------------------------------------------------------------------*)
+PROCEDURE RXDELAY  ( VAR func : ARRAY OF CHAR;
+                         argc : LONGCARD;
+                        pargv : PRXSTRING;
+                     VAR  que : ARRAY OF CHAR;
+                     VAR  ret : RXSTRING) : LONGCARD;
+
+(*-------------------------------------------------------------------*)
+(* REXX procedure to constrain a number within a specified range.    *)
+(* Usage: xclipped = RxClipRange( x, xmin, xmax )                    *)
+(*-------------------------------------------------------------------*)
+PROCEDURE RXCLIPRANGE ( VAR func : ARRAY OF CHAR;
+                            argc : LONGCARD;
+                           pargv : PRXSTRING;
+                        VAR que  : ARRAY OF CHAR;
+                        VAR ret  : RXSTRING) : LONGCARD;
+
+(*-------------------------------------------------------------------*)
+(* REXX procedure to convert a string to upper case.                 *)
+(* Usage: s = RxUpperCase( "abHmL7" )                                *)
+(*        result is s = "ABHML7"                                     *)
+(*-------------------------------------------------------------------*)
+PROCEDURE RXUPPERCASE( VAR func : ARRAY OF CHAR;
+                           argc : LONGCARD;
+                          pargv : PRXSTRING;
+                       VAR que  : ARRAY OF CHAR;
+                       VAR ret  : RXSTRING) : LONGCARD;
+
+END MyRxDLL.
+

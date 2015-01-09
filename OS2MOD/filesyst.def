@@ -1,0 +1,197 @@
+DEFINITION MODULE FileSystem;
+
+(**************************************************************************
+   OS/2 2.x  Modula-2 standard utility for file system management.
+
+   Copyright (c) 1993 by Juergen Neuhoff
+**************************************************************************)
+
+IMPORT SYSTEM;
+IMPORT OS2DEF;
+
+TYPE
+  File     = RECORD         (* File structure for Modula FileSystem *)
+    id       : LONGCARD;    (* OS/2 2.x handle for file identification *)
+    res      : LONGCARD;    (* OS/2 2.x API return value for response *)
+    eof      : BOOLEAN;     (* end-of-file indicator *)
+    tmp      : BOOLEAN;     (* TRUE, if temporary file *)
+    name     : ARRAY [0..OS2DEF.CCHMAXPATH-1] OF CHAR;
+             END;
+
+CONST                       (* File.res response values *)
+  done            = 0;
+  notdone         = 0FFFFH;
+  lockerror       = 33;     (* OS/2 2.x ERROR_LOCK_VIOLATION *)
+  permissionerror = 32;     (* OS/2 2.x ERROR_SHARING_VIOLATION *)
+  callerror       = 22;     (* OS/2 2.x ERROR_BAD_COMMAND *)
+  unknownmedium   = 26;     (* OS/2 2.x ERROR_NOT_DOS_DISK *)
+  unknownfile     = 2;      (* OS/2 2.x ERROR_FILE_NOT_FOUND *)
+  filenameerror   = 123;    (* OS/2 2.x ERROR_INVALID_NAME *)
+  toomanyfiles    = 4;      (* OS/2 2.x ERROR_TOO_MANY_OPEN_FILES *)
+  mediumfull      = 112;    (* OS/2 2.x ERROR_DISK_FULL *)
+  paramerror      = 87;     (* OS/2 2.x ERROR_INVALID_PARAMETER *)
+
+
+(*$XL- no language extensions, VAR-record params without dyn. type info *)   
+
+
+PROCEDURE Create( VAR f : File; FileName : ARRAY OF CHAR );
+(*
+   If 'FileName' is a nullstring, open a temporary new file,
+   else create and open a new nontemporary file.
+   Returns f.id = OS/2 handle, if successful, and f.res response.
+*)
+
+PROCEDURE Lookup( VAR f : File; FileName : ARRAY OF CHAR; new : BOOLEAN );
+(*
+   Search for file specified by drive, directory and name given in 'FileName'
+   and set current position to beginning of file. If file is found,
+   it is opened as file structure 'f'. If file is not found, 'new' is
+   checked, and if 'new' is TRUE, a new permanent file with the name given
+   in 'FileName' is created and it is opened as file structure 'f'.
+   If 'new' is FALSE, no action takes place.
+*)
+
+PROCEDURE Close( VAR f : File );
+(*
+   Terminate operations on file 'f'. If file is temporary, it will
+   be deleted.
+*)
+
+PROCEDURE Delete( VAR f : File );
+(*
+   Remove file entry from file directory.
+*)
+
+PROCEDURE Rename( VAR f : File; FileName : ARRAY OF CHAR );
+(*
+   Change name of file 'f' to 'FileName'. If 'FileName' is a null string,
+   'f' is changed to a temporary nameless file. If 'f' is a temporary file
+   initialized by the 'Create' or 'Lookup', 'Rename' makes it permanent.
+*)
+
+PROCEDURE SetRead( VAR f : File );
+(*
+   Set the file to reading state without changing the current position.
+*)
+
+PROCEDURE SetWrite( VAR f : File );
+(*
+   Set the file to writing state without changing the current position.
+*)
+
+PROCEDURE SetModify( VAR f : File );
+(*
+   Set the file to modify state without changing the current position.
+   Under OS/2 2.x this simply means both reading and writing state.
+*)
+
+PROCEDURE SetOpen( VAR f : File );
+(*
+   Set the file to open state without changing the current position.
+   Under OS/2 2.x, this has no meaning.
+*)
+
+PROCEDURE Doio( VAR f : File );
+(*
+   Under OS/2 2.x this procedure flushes all I/O buffers to the disk.
+*)
+
+PROCEDURE SetPos( VAR f : File ; HighPos, LowPos : CARDINAL );
+(*
+   Set randomly accessed file to a new position at:
+   LowPos + HighPos * (MAX( CARDINAL ) + 1).
+*)
+
+PROCEDURE GetPos( VAR f : File; VAR HighPos, LowPos : CARDINAL );
+(*
+   Get current file position: LowPos + HighPos * (MAX( CARDINAL ) + 1).
+*)
+
+PROCEDURE Length( VAR f : File; VAR HighPos, LowPos : CARDINAL );
+(*
+   Return current file length: LowPos + HighPos * (MAX( CARDINAL ) + 1).
+*)
+
+PROCEDURE SetLongPos( VAR f : File; Pos : LONGCARD );
+(*
+   Set randomly accessed file to a new position
+*)
+
+PROCEDURE GetLongPos( VAR f : File; VAR Pos : LONGCARD );
+(*
+   Get current file position in a single long variable
+*)
+
+PROCEDURE LongLength( VAR f : File; VAR LongPos : LONGCARD );
+(*
+   Return current file length as a single long value
+*)
+
+PROCEDURE Reset( VAR f : File );
+(*
+   Set the file to open state and set current position to file beginning.
+   Under OS/2 2.x this simply means repositioning to the beginning.
+*)
+
+PROCEDURE Again( VAR f : File );
+(*
+   Causes a next file read accesss to a previously read character.
+   Under OS/2 2.x file buffering is managed by the operating system,
+   hence only a setting to to previous position is performed.
+*)
+
+PROCEDURE ReadByte( VAR f : File; VAR b : SYSTEM.BYTE );
+(*
+   Read one byte from file at current position and advance position
+   by one byte. If end-of-file is encountered, a null byte is returned
+   f.eof is set TRUE and f.res is set to done.
+*)
+
+PROCEDURE ReadWord( VAR f : File; VAR w : SYSTEM.WORD );
+(*
+   Same as Readbyte, but for a machine word.
+*)
+
+PROCEDURE ReadLongWord( VAR f : File; VAR lw : SYSTEM.LONGWORD );
+(*
+   Same as ReadWord, but for a double word.
+*)
+
+PROCEDURE ReadChar( VAR f : File; VAR ch : CHAR );
+(*
+   Same as ReadByte. Returned value has character type.
+*)
+
+PROCEDURE ReadBlock( VAR f : File; VAR Block : ARRAY OF SYSTEM.BYTE );
+(*
+   Read any data block from a file and advance file position by the
+   number of bytes read.
+*)
+
+PROCEDURE WriteChar( VAR f : File; ch : CHAR );
+(*
+   Write one character to the file at current position. The file will
+   be positioned at the next character when WriteChar is done.
+*)
+
+PROCEDURE WriteString( VAR f : File; s : ARRAY OF CHAR );
+(*
+   Write a string (excluding zero terminator) to the file at current
+   position. The file will be incremented by the string length.
+*)
+
+PROCEDURE WriteBlock( VAR f : File; VAR Block : ARRAY OF SYSTEM.BYTE );
+(*
+   Write a variable of any type and size to the file at current position
+   and increment file position by HIGH(s).
+*)
+
+PROCEDURE WriteLn( VAR f : File );
+(*
+   Write a carriage/line feed sequence at current position and
+   increment file position by 2.
+*)
+
+END FileSystem.
+

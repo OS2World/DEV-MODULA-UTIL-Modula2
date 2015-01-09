@@ -1,0 +1,181 @@
+DEFINITION MODULE TextWindows;
+
+(*************************************************************************
+   32-bit OS/2 Modula-2 standard text windows.
+
+   Note: This definition is based upon N.Wirth's
+         "Programming in Modula-2" 4th edition;
+
+         Not yet implemented!
+
+   Copyright (c) 1995 by Juergen Neuhoff
+***************************************************************************)
+
+
+IMPORT Windows;
+
+TYPE
+  Window      = Windows.Window;
+  RestoreProc = Windows.RestoreProc;
+
+VAR
+  Done        : BOOLEAN; (* Done = "previous operation was successfully executed *)
+  termCH      : CHAR;    (* termination character *)
+
+PROCEDURE OpenTextWindow
+(
+  VAR u       : Window;
+  x,y,w,h     : CARDINAL;
+  name        : ARRAY OF CHAR
+);
+
+PROCEDURE RedefTextWindow
+(
+  u           : Window;
+  x,y,w,h     : CARDINAL
+);
+
+PROCEDURE CloseTextWindow
+(
+  u           : Window
+);
+
+PROCEDURE AssignFont
+(
+  u           : Window;
+  frame       : CARDINAL;
+  charW       : CARDINAL;
+  lineH       : CARDINAL
+);
+(* Assign non proportional font to window u *)
+
+PROCEDURE AssignRestoreProc
+(
+  u           : Window;
+  r           : RestoreProc
+);
+
+PROCEDURE AssignEOWAction
+(
+  u           : Window;
+  r           : RestoreProc
+);
+(* Assign reaction on "end of window" condition for window u *)
+
+PROCEDURE ScrollUp
+(
+  u           : Window
+);
+(* Scroll one line up in window u (standard EOW-action) *)
+
+PROCEDURE DrawTitle
+(
+  u           : Window;
+  name        : ARRAY OF CHAR
+);
+
+PROCEDURE DrawLine
+(
+  u           : Window;
+  line,col    : CARDINAL
+);
+(* col  = 0: draw horizontal line at 'line' ;
+   line = 0: draw vertical line at 'col' ;
+*)
+
+PROCEDURE SetCaret
+(
+  u           : Window;
+  on          : BOOLEAN
+);
+
+PROCEDURE Invert
+(
+  u           : Window
+);
+
+PROCEDURE IdentifyPos
+(
+  u            : Window;
+  x,y          : CARDINAL;
+  VAR line,col : CARDINAL
+);
+
+PROCEDURE GetPos
+(
+  u            : Window;
+  VAR line,col : CARDINAL
+);
+
+PROCEDURE SetPos
+(
+  u           : Window;
+  line,col    : CARDINAL
+);
+
+PROCEDURE ReadString
+(
+  u           : Window;
+  VAR a       : ARRAY OF CHAR
+);
+
+PROCEDURE ReadCard
+(
+  u           : Window;
+  VAR x       : CARDINAL
+);
+
+PROCEDURE ReadInt
+(
+  u           : Window;
+  VAR x       : INTEGER
+);
+
+PROCEDURE Write
+(
+  u           : Window;
+  ch          : CHAR
+);
+(* Write character ch at current position.
+   Interpret BS,LF,FF,CR,CAN,EOL and DEL
+*)
+
+PROCEDURE WriteLn
+(
+  u           : Window
+);
+
+PROCEDURE WriteString
+(
+  u           : Window;
+  a           : ARRAY OF CHAR
+);
+
+PROCEDURE WriteCard
+(
+  u           : Window;
+  x,n         : CARDINAL
+);
+(* Write cardinal x with (at least) n characters.
+   If n is greater than the number of digits needed,
+   blanks are added preceding the number
+*)
+
+PROCEDURE WriteInt
+(
+  u           : Window;
+  x           : INTEGER;
+  n           : CARDINAL
+);
+(* Write integer x with (at least) n characters.
+   If n is greater than the number of digits needed,
+   blanks are added preceding the number
+*)
+
+PROCEDURE WriteOct
+(
+  u           : Window;
+  x,n         : CARDINAL
+);
+
+END TextWindows.

@@ -1,0 +1,48 @@
+DEFINITION MODULE Random;
+(*
+    Title     : An implementation of pseudo random numbers
+    Author    : I.R. Matters (Ian.Matters@anu.edu.au)
+    System    : Juergen Neuhoff's Modula-2 compiler on OS/2
+    Version   : 1.00
+    Last Edit : 30 July 1995
+*)
+
+
+VAR Seed : REAL;  (* The random number generator seed value.
+                     Initialized to 4.0 by Random module.
+                  *)
+
+PROCEDURE Randomize;
+(*
+  Initialize the random number generator
+  seed with a pseudo-random value.
+*)
+
+
+PROCEDURE RandomReal(): REAL;
+(*
+   Return a random number in the range 0.0 <= RandomReal < 1.0 
+*)
+
+
+PROCEDURE RandomGaussReal(): REAL;
+(*
+   Return a random number with a Gaussian distribution
+   in the range 0.0 <= RandomGaussReal < 1.0 
+*)
+
+
+PROCEDURE RandomCard (Range: CARDINAL): CARDINAL;
+(*
+   Return a random number in the range 0 <= RandomCard < Range 
+*)
+
+
+PROCEDURE RandomGaussCard (Range: CARDINAL): CARDINAL;
+(*
+   Return a random number with a Gaussian distribution
+   in the range 0 <= RandomGaussCard < Range 
+*)
+
+
+END Random.

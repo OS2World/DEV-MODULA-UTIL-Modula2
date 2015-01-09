@@ -1,0 +1,80 @@
+DEFINITION MODULE Strings;
+
+(**************************************************************************
+   OS/2 2.x  Modula-2 utility for string handling.
+
+   Copyright (c) 1993-1995 by Juergen Neuhoff
+**************************************************************************)
+
+PROCEDURE Assign
+( VAR Source       : ARRAY OF CHAR;
+  VAR Destination  : ARRAY OF CHAR
+);
+
+PROCEDURE Insert
+( SubStr           : ARRAY OF CHAR;
+  VAR Str          : ARRAY OF CHAR;
+  Index            : LONGCARD
+);
+
+PROCEDURE Append
+( SubStr           : ARRAY OF CHAR;
+  VAR Str          : ARRAY OF CHAR
+);
+
+PROCEDURE Delete
+( VAR Str          : ARRAY OF CHAR;
+  Index            : LONGCARD;
+  Len              : LONGCARD
+);
+
+PROCEDURE Pos
+( SubStr           : ARRAY OF CHAR;
+  Str              : ARRAY OF CHAR
+)                  : LONGCARD;
+(* 
+   returns the starting position SubStr in Str. 
+   If SubStr not found, return HIGH(Str)+1
+*)
+
+PROCEDURE Copy
+( Str              : ARRAY OF CHAR;
+  Index            : LONGCARD;
+  Len              : LONGCARD;
+  VAR Result       : ARRAY OF CHAR
+);
+
+PROCEDURE Concat
+( Str1             : ARRAY OF CHAR;
+  Str2             : ARRAY OF CHAR;
+  VAR Result       : ARRAY OF CHAR
+);
+
+PROCEDURE Length
+( VAR Str          : ARRAY OF CHAR
+)                  : LONGCARD;
+(*
+   returns the minimum of HIGH( Str )+1 and zero byte position
+   of a possibly zero terminated string.
+*)
+
+PROCEDURE Size
+( VAR Str          : ARRAY OF CHAR
+)                  : LONGCARD;
+(*
+   returns for a zero terminated string the zero byte position.
+*)
+
+PROCEDURE Compare
+( Str1             : ARRAY OF CHAR;
+  Str2             : ARRAY OF CHAR
+)                  : INTEGER;
+
+PROCEDURE Fill
+( Pos              : LONGCARD;
+  Size             : LONGCARD;
+  Filler           : CHAR;
+  VAR Str          : ARRAY OF CHAR
+);
+
+END Strings.

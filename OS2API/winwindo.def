@@ -1,0 +1,674 @@
+DEFINITION MODULE WINWINDOWMGR;
+
+(************************************************************************
+  OS/2 2.0 interface for general window manager.
+           09.08.95 21.49: changed WinBeginPaint
+
+  Copyright (c) 1992 by Juergen Neuhoff
+*************************************************************************)
+
+(*$XL+       Modula-2 language extensions: '_' allowed for symbol names *)
+(*$CDECL+    C-style procedures                                         *)
+(*$A         default alignment for record fields                        *)
+
+IMPORT SYSTEM;
+FROM   OS2DEF IMPORT TYPEPREFIX, HAB, HWND, HPS, HDC, HRGN, HMODULE, HBITMAP;
+FROM   OS2DEF IMPORT PID, TID, RECTL, PRECTL, PSZ, LHANDLE, POINTL;
+FROM   WINDEF IMPORT PFNWP, MPARAM, MRESULT;
+
+
+PROCEDURE WinCreateWindow
+( WinHandle         : HWND;
+  ClassName         : ARRAY OF CHAR;
+  Name              : ARRAY OF CHAR;
+  Style             : LONGCARD;
+  x                 : LONGINT;
+  y                 : LONGINT;
+  Width             : LONGINT;
+  Height            : LONGINT;
+  OwnerWinHandle    : HWND;
+  BehindWinHandle   : HWND;
+  WinId             : LONGCARD;
+  VAR CtlData       : ARRAY OF SYSTEM.BYTE;
+  VAR PresParams    : ARRAY OF SYSTEM.BYTE
+)                   : HWND;
+
+PROCEDURE WinEnableWindow
+( WinHandle         : HWND;
+  Enable            : BOOLEAN
+)                   : BOOLEAN;
+
+PROCEDURE WinIsWindowEnabled
+( WinHandle         : HWND
+)                   : BOOLEAN;
+
+PROCEDURE WinEnableWindowUpdate
+( WinHandle         : HWND;
+  Enable            : BOOLEAN
+)                   : BOOLEAN;
+
+PROCEDURE WinIsWindowVisible
+( WinHandle         : HWND
+)                   : BOOLEAN;
+
+PROCEDURE WinQueryWindowText
+( WinHandle         : HWND;
+  BufferLen         : LONGINT;
+  VAR Buffer        : ARRAY OF CHAR
+)                   : LONGINT;
+
+PROCEDURE WinSetWindowText
+( WinHandle         : HWND;
+  Text              : ARRAY OF CHAR
+)                   : BOOLEAN;
+
+PROCEDURE WinQueryWindowTextLength
+( WinHandle         : HWND
+)                   : LONGINT;
+
+PROCEDURE WinWindowFromID
+( ParentWinHandle   : HWND;
+  ChildId           : LONGCARD
+)                   : HWND;
+
+PROCEDURE WinIsWindow
+( AnchorBlockHandle : HAB;
+  WinHandle         : HWND
+)                   : BOOLEAN;
+
+PROCEDURE WinQueryWindow
+( WinHandle         : HWND;
+  ICode             : LONGINT
+)                   : HWND;
+
+CONST (* WinQueryWindow() codes *)
+  QW_NEXT       = 0; (* next window in z-order (window below) *)
+  QW_PREV       = 1; (* previous window in z-order (window above) *)
+  QW_TOP        = 2; (* topmost child window *)
+  QW_BOTTOM     = 3; (* bottommost child window *)
+  QW_OWNER      = 4; (* owner of window *)
+  QW_PARENT     = 5; (* parent of window *)
+  QW_NEXTTOP    = 6; (* next window of the owner window hierarchy *)
+  QW_PREVTOP    = 7; (* previous window of the owner window hierarchy *)
+  QW_FRAMEOWNER = 8;
+
+PROCEDURE WinMultWindowFromIDs
+( ParentWinHandle   : HWND;
+  VAR WinHandles    : ARRAY OF HWND;
+  FirstId           : LONGCARD;
+  LastId            : LONGCARD
+)                   : LONGINT;
+
+PROCEDURE WinSetParent
+( WinHandle         : HWND;
+  NewParentHandle   : HWND;
+  Redraw            : BOOLEAN
+)                   : BOOLEAN;
+
+PROCEDURE WinIsChild
+( WinHandle         : HWND;
+  ParentWinHandle   : HWND
+)                   : BOOLEAN;
+
+PROCEDURE WinSetOwner
+( WinHandle         : HWND;
+  NewOwner          : HWND
+)                   : BOOLEAN;
+
+PROCEDURE WinQueryWindowProcess
+( WinHandle         : HWND;
+  VAR ProcessId     : PID;
+  VAR ThreadId      : TID
+)                   : BOOLEAN;
+
+PROCEDURE WinQueryObjectWindow
+( DeskTopWinHandle  : HWND
+)                   : HWND;
+
+PROCEDURE WinQueryDesktopWindow
+( AnchorBlockHandle : HAB;
+  DevContextHandle  : HDC
+)                   : HWND;
+
+PROCEDURE WinSetWindowPos
+( WinHandle            : HWND;
+  InsertBehindHandle   : HWND;
+  x                    : LONGINT;
+  y                    : LONGINT;
+  xSize                : LONGINT;
+  ySize                : LONGINT;
+  Options              : LONGCARD
+)                      : BOOLEAN;
+
+CONST (* WinSetWindowPos() flags *)
+  SWP_SIZE             = 0001H; (* change the window size *)
+  SWP_MOVE             = 0002H; (* change the window x,y position *)
+  SWP_ZORDER           = 0004H; (* change the relative window placement *)
+  SWP_SHOW             = 0008H; (* show the window *)
+  SWP_HIDE             = 0010H; (* hide the window *)
+  SWP_NOREDRAW         = 0020H; (* changes are not redrawn *)
+  SWP_NOADJUST         = 0040H; (* no WM_ADJUSTWINDOWPOS before moving/sizing *)
+  SWP_ACTIVATE         = 0080H; (* activate if frame window *)
+  SWP_DEACTIVATE       = 0100H; (* deactivate if frame window *)
+  SWP_EXTSTATECHANGE   = 0200H;
+  SWP_MINIMIZE         = 0400H; (* minimize the window *)
+  SWP_MAXIMIZE         = 0800H; (* maximize the window *)
+  SWP_RESTORE          = 1000H; (* restore the window to normal size/pos *)
+  SWP_FOCUSACTIVATE    = 2000H;
+  SWP_FOCUSDEACTIVATE  = 4000H;
+  SWP_NOAUTOCLOSE      = 8000H; (* Valid in PROGDETAILS struct only *)
+
+TYPE (* WinSetMultWindowPos() record *)
+  SWP                    = RECORD
+    CASE                   : TYPEPREFIX OF
+    | TRUE                 :
+      fl                   : LONGCARD;
+      cy                   : LONGINT;
+      cx                   : LONGINT;
+    | FALSE                :
+      Flags                : LONGCARD;
+      ySize                : LONGINT;
+      xSize                : LONGINT;
+    END;
+    y                      : LONGINT;
+    x                      : LONGINT;
+    CASE                   : TYPEPREFIX OF
+    | TRUE                 :
+      hwndInsertBehind     : HWND;
+      hwnd                 : HWND;
+      ulReserved1          : LONGCARD;
+      ulReserved2          : LONGCARD;
+    | FALSE                :
+      InsertBehindHandle   : HWND;
+      WinHandle            : HWND;
+      Reserved1            : LONGCARD;
+      Reserved2            : LONGCARD;
+    END;                   END;
+  PSWP                   = POINTER TO SWP;
+
+PROCEDURE WinSetMultWindowPos
+( AnchorBlockHandle    : HAB;
+  VAR SetWinPos        : ARRAY OF SWP;
+  SetWinPosCount       : LONGINT
+)                      : BOOLEAN;
+
+PROCEDURE WinQueryWindowPos
+( WinHandle            : HWND;
+  VAR WinPos           : SWP
+)                      : BOOLEAN;
+
+CONST (* returned from WM_ADJUSTWINDOWPOS and passed to WM_WINDOWPOSCHANGED *)
+  AWP_MINIMIZED        = 00010000H;
+  AWP_MAXIMIZED        = 00020000H;
+  AWP_RESTORED         = 00040000H;
+  AWP_ACTIVATE         = 00080000H;
+  AWP_DEACTIVATE       = 00100000H;
+
+PROCEDURE WinUpdateWindow
+( WinHandle            : HWND
+)                      : BOOLEAN;
+
+PROCEDURE WinInvalidateRect
+( WinHandle            : HWND;
+  Rectangle            : RECTL;
+  InclClippedChildren  : BOOLEAN
+)                      : BOOLEAN;
+
+PROCEDURE WinInvalidateRegion
+( WinHandle            : HWND;
+  RegionHandle         : HRGN;
+  InclClippedChildren  : BOOLEAN
+)                      : BOOLEAN;
+
+PROCEDURE WinInvertRect
+( PresSpaceHandle      : HPS;
+  Rectangle            : RECTL
+)                      : BOOLEAN;
+
+PROCEDURE WinDrawBitmap
+( PresSpaceHandle      : HPS;
+  BitMapHandle         : HBITMAP;
+  SubRectangle         : PRECTL;
+  VAR BitMapDest       : POINTL;
+  ForeColor            : LONGINT;
+  BackColor            : LONGINT;
+  Flags                : LONGCARD
+)                      : BOOLEAN;
+
+CONST (* WinDrawBitmap() flags *)
+  DBM_NORMAL           = 0000H;
+  DBM_INVERT           = 0001H;
+  DBM_HALFTONE         = 0002H;
+  DBM_STRETCH          = 0004H;
+  DBM_IMAGEATTRS       = 0008H;
+
+PROCEDURE WinDrawText
+( PresSpaceHandle      : HPS;
+  Count                : LONGINT;
+  Text                 : ARRAY OF CHAR;
+  VAR Rectangle        : RECTL;
+  ForeColor            : LONGINT;
+  BackColor            : LONGINT;
+  CmdFlags             : LONGCARD
+)                      : LONGINT;
+
+CONST
+(*
+* WinDrawText() codes:
+* From DT_LEFT to DT_EXTERNALLEADING, the codes are designed to be OR'ed with
+* WINSTATICS.SS_TEXT to create variations of the basic text static item.
+*)
+  DT_LEFT            = 0000H;
+  DT_QUERYEXTENT     = 0002H;
+  DT_UNDERSCORE      = 0010H;
+  DT_STRIKEOUT       = 0020H;
+  DT_TEXTATTRS       = 0040H;
+  DT_EXTERNALLEADING = 0080H;
+  DT_CENTER          = 0100H;
+  DT_RIGHT           = 0200H;
+  DT_TOP             = 0000H;
+  DT_VCENTER         = 0400H;
+  DT_BOTTOM          = 0800H;
+  DT_HALFTONE        = 1000H;
+  DT_MNEMONIC        = 2000H;
+  DT_WORDBREAK       = 4000H;
+  DT_ERASERECT       = 8000H;
+
+PROCEDURE WinDrawBorder
+( PresSpaceHandle      : HPS;
+  Rectangle            : RECTL;
+  VertSizeWidth        : LONGINT;
+  HorizSideWidth       : LONGINT;
+  BorderColor          : LONGINT;
+  InteriorColor        : LONGINT;
+  CmdFlags             : LONGCARD
+)                      : BOOLEAN;
+
+CONST (* WinDrawBorder() flags *)
+  DB_PATCOPY      = 0000H;
+  DB_PATINVERT    = 0001H;
+  DB_DESTINVERT   = 0002H;
+  DB_AREAMIXMODE  = 0003H;
+  DB_ROP          = 0007H;
+  DB_INTERIOR     = 0008H;
+  DB_AREAATTRS    = 0010H;
+  DB_STANDARD     = 0100H;
+  DB_DLGBORDER    = 0200H;
+
+PROCEDURE WinLoadString
+( AnchorBlockHandle    : HAB;
+  ResourceHandle       : HMODULE;
+  StringId             : LONGCARD;
+  BufferMax            : LONGINT;
+  VAR Buffer           : ARRAY OF CHAR
+)                      : LONGINT;
+
+PROCEDURE WinLoadMessage
+( AnchorBlockHandle    : HAB;
+  ModuleHandle         : HMODULE;
+  MessageId            : LONGCARD;
+  BufferMax            : LONGINT;
+  VAR Buffer           : ARRAY OF CHAR
+)                      : LONGINT;
+
+PROCEDURE WinRegisterClass
+( AnchorBlockHandle       : HAB;
+  ClassName               : ARRAY OF CHAR;
+  WndProc                 : PFNWP;
+  ClassStyle              : LONGCARD;
+  ExtraBytes              : CARDINAL
+)                         : BOOLEAN;
+
+PROCEDURE WinDefWindowProc
+( WinHandle               : HWND;
+  MessageId               : LONGCARD;
+  Param1                  : MPARAM;
+  Param2                  : MPARAM
+)                         : MRESULT;
+
+PROCEDURE WinDestroyWindow
+( WinHandle               : HWND
+)                         : BOOLEAN;
+
+PROCEDURE WinShowWindow
+( WinHandle               : HWND;
+  NewVisibility           : BOOLEAN
+)                         : BOOLEAN;
+
+PROCEDURE WinQueryWindowRect
+( WinHandle               : HWND;
+  VAR Rect                : RECTL
+)                         : BOOLEAN;
+
+PROCEDURE WinGetPS
+( WinHandle               : HWND
+)                         : HPS;
+
+PROCEDURE WinReleasePS
+( PresSpaceHandle         : HPS
+)                         : BOOLEAN;
+
+PROCEDURE WinEndPaint
+( PresSpaceHandle         : HPS
+)                         : BOOLEAN;
+
+PROCEDURE WinGetClipPS
+( WinHandle               : HWND;
+  ClipWinHandle           : HWND;
+  ClipFlags               : LONGCARD
+)                         : HPS;
+
+CONST (* WinGetClipPS() flags *)
+  PSF_LOCKWINDOWUPDATE    = 0001H;
+  PSF_CLIPUPWARDS         = 0002H;
+  PSF_CLIPDOWNWARDS       = 0004H;
+  PSF_CLIPSIBLINGS        = 0008H;
+  PSF_CLIPCHILDREN        = 0010H;
+  PSF_PARENTCLIP          = 0020H;
+
+PROCEDURE WinIsWindowShowing
+( WinHandle               : HWND
+)                         : BOOLEAN;
+
+PROCEDURE WinBeginPaint
+( WinHandle               : HWND;
+  PresSpaceHandle         : HPS;
+  Rect                    : PRECTL
+)                         : HPS;
+
+PROCEDURE WinOpenWindowDC
+( WinHandle               : HWND
+)                         : HDC;
+
+PROCEDURE WinScrollWindow
+( WinHandle               : HWND;
+  dx                      : LONGINT;
+  dy                      : LONGINT;
+  ScrollRect              : PRECTL;
+  ClipRect                : PRECTL;
+  UpdateRgn               : HRGN;
+  UpdateRect              : PRECTL;
+  Options                 : LONGCARD
+)                         : LONGINT;
+
+CONST (* WinScrollWindow() flags *)
+  SW_SCROLLCHILDREN       = 0001H;
+  SW_INVALIDATERGN        = 0002H;
+
+PROCEDURE WinFillRect
+( PresSpaceHandle         : HPS;
+  VAR Rect                : RECTL;
+  Color                   : LONGINT
+)                         : BOOLEAN;
+
+PROCEDURE WinQueryVersion
+( AnchorBlockHandle       : HAB
+)                         : LONGCARD;
+
+TYPE (* WinQueryVersion() return value (access thru type transfer) *)
+  QVERSDATA    = RECORD
+    environment  : CARDINAL;
+    version      : CARDINAL;
+  END;
+  PQVERSDATA   = POINTER TO QVERSDATA;
+
+PROCEDURE WinInitialize
+( Options                 : LONGCARD
+)                         : HAB;
+
+CONST (* for WinInitialize() *)
+  QV_OS2       = 0000H;
+  QV_CMS       = 0001H;
+  QV_TSO       = 0002H;
+  QV_TSOBATCH  = 0003H;
+  QV_OS400     = 0004H;
+
+PROCEDURE WinTerminate
+( AnchorBlockHandle       : HAB
+)                         : BOOLEAN;
+
+PROCEDURE WinQueryAnchorBlock
+( WinHandle               : HWND
+)                         : HAB;
+
+PROCEDURE WinSetActiveWindow
+( DesktopWinHandle        : HWND;
+  WinHandle               : HWND
+)                         : BOOLEAN;
+
+TYPE (* WM_CREATE message record *)
+   CREATESTRUCT         = RECORD
+     CASE                 : TYPEPREFIX OF
+     | TRUE               :
+       pPresParams        : SYSTEM.ADDRESS;
+       pCtlData           : SYSTEM.ADDRESS;
+       id                 : LONGCARD;
+       hwndInsertBehind   : HWND;
+       hwndOwner          : HWND;
+       cy                 : LONGINT;
+       cx                 : LONGINT;
+     | FALSE              :
+       PresParams         : SYSTEM.ADDRESS;
+       CtlData            : SYSTEM.ADDRESS;
+       Id                 : LONGCARD;
+       InsertBehindHandle : HWND;
+       OwnerHandle        : HWND;
+       ySize              : LONGINT;
+       xSize              : LONGINT;
+     END;
+     y                    : LONGINT;
+     x                    : LONGINT;
+     CASE                 : TYPEPREFIX OF
+     | TRUE               :
+       flStyle            : LONGCARD;
+       pszText            : PSZ;
+       pszClass           : PSZ;
+       hwndParent         : HWND;
+     | FALSE              :
+       Style              : LONGCARD;
+       Text               : PSZ;
+       Class              : PSZ;
+       ParentHandle       : HWND;
+     END;                 END;
+   PCREATESTRUCT        = POINTER TO CREATESTRUCT;
+
+TYPE (* WinQueryClassInfo() structure *)
+   CLASSINFO            = RECORD
+     CASE                 : TYPEPREFIX OF
+     | TRUE               :
+       flClassStyle       : LONGCARD;
+       pfnWindowProc      : PFNWP;
+       cbWindowData       : LONGCARD;
+     | FALSE              :
+       ClassStyle         : LONGCARD;
+       WindowProc         : PFNWP;
+       WindowDataLen      : LONGCARD;
+     END;                 END;
+   PCLASSINFO           = POINTER TO PCLASSINFO;
+
+PROCEDURE WinSubclassWindow
+( WinHandle               : HWND;
+  NewWindowProc           : PFNWP
+)                         : PFNWP;
+
+PROCEDURE WinQueryClassName
+( WinHandle               : HWND;
+  BufferMax               : LONGINT;
+  VAR Buffer              : ARRAY OF CHAR
+)                         : LONGINT;
+
+PROCEDURE WinQueryClassInfo
+( AnchorBlockHandle       : HAB;
+  ClassName               : ARRAY OF CHAR;
+  VAR ClassInfo           : CLASSINFO
+)                         : BOOLEAN;
+
+PROCEDURE WinQueryActiveWindow
+( ParentWinHandle         : HWND
+)                         : HWND;
+
+PROCEDURE WinIsThreadActive
+( AnchorBlockHandle       : HAB
+)                         : BOOLEAN;
+
+PROCEDURE WinQuerySysModalWindow
+( DesktopWinHandle        : HWND
+)                         : HWND;
+
+PROCEDURE WinSetSysModalWindow
+( DesktopWinHandle        : HWND;
+  WinHandle               : HWND
+)                         : BOOLEAN;
+
+PROCEDURE WinQueryWindowUShort
+( WinHandle               : HWND;
+  Index                   : LONGINT
+)                         : CARDINAL;
+
+PROCEDURE WinSetWindowUShort
+( WinHandle               : HWND;
+  Index                   : LONGINT;
+  Data                    : CARDINAL
+)                         : BOOLEAN;
+
+PROCEDURE WinQueryWindowULong
+( WinHandle               : HWND;
+  Index                   : LONGINT
+)                         : LONGCARD;
+
+PROCEDURE WinSetWindowULong
+( WinHandle               : HWND;
+  Index                   : LONGINT;
+  Data                    : LONGCARD
+)                         : BOOLEAN;
+
+PROCEDURE WinQueryWindowPtr
+( WinHandle               : HWND;
+  Index                   : LONGINT
+)                         : SYSTEM.ADDRESS;
+
+PROCEDURE WinSetWindowPtr
+( WinHandle               : HWND;
+  Index                   : LONGINT;
+  Ptr                     : SYSTEM.ADDRESS
+)                         : BOOLEAN;
+
+PROCEDURE WinSetWindowBits
+( WinHandle               : HWND;
+  Index                   : LONGINT;
+  Data                    : LONGCARD;
+  Mask                    : LONGCARD
+)                         : BOOLEAN;
+
+CONST (* Standard WinQueryWindowUShort/ULong() indices *)
+  QWS_USER     =  0;
+  QWS_ID       = -1;
+  QWS_MIN      = -1;
+  QWL_USER     =  0;
+  QWL_STYLE    = -2;
+  QWP_PFNWP    = -3;
+  QWL_HMQ      = -4;
+  QWL_RESERVED = -5;
+  QWL_MIN      = -6;
+
+CONST (* WC_FRAME WinQueryWindowUShort/ULong() indices *)
+  QWL_HHEAP          = 0004H;
+  QWL_HWNDFOCUSSAVE  = 0018H;
+  QWL_DEFBUTTON      = 0040H;
+  QWL_PSSCBLK        = 0048H;
+  QWL_PFEPBLK        = 004CH;
+  QWL_PSTATBLK       = 0050H;
+  QWS_FLAGS          = 0008H;
+  QWS_RESULT         = 000AH;
+  QWS_XRESTORE       = 000CH;
+  QWS_YRESTORE       = 000EH;
+  QWS_CXRESTORE      = 0010H;
+  QWS_CYRESTORE      = 0012H;
+  QWS_XMINIMIZE      = 0014H;
+  QWS_YMINIMIZE      = 0016H;
+
+TYPE
+  HENUM = LHANDLE; (* Window enumeration *)
+
+PROCEDURE WinBeginEnumWindows
+( WinHandle               : HWND
+)                         : HENUM;
+
+PROCEDURE WinGetNextWindow
+( EnumHandle              : HENUM
+)                         : HWND;
+
+PROCEDURE WinEndEnumWindows
+( EnumHandle              : HENUM
+)                         : BOOLEAN;
+
+PROCEDURE WinWindowFromPoint
+( WinHandle               : HWND;
+  VAR Point               : POINTL;
+  EnumChildren            : BOOLEAN
+)                         : HWND;
+
+PROCEDURE WinMapWindowPoints
+( FromWinHandle           : HWND;
+  ToWinHandle             : HWND;
+  VAR Points              : POINTL;
+  Count                   : LONGINT
+)                         : BOOLEAN;
+
+PROCEDURE WinValidateRect
+( WinHandle               : HWND;
+  Rectangle               : RECTL;
+  InclClippedChildren     : BOOLEAN
+)                         : BOOLEAN;
+
+PROCEDURE WinValidateRegion
+( WinHandle               : HWND;
+  RegionHandle            : HRGN;
+  InclClippedChildren     : BOOLEAN
+)                         : BOOLEAN;
+
+PROCEDURE WinWindowFromDC
+( DecContextHandle        : HDC
+)                         : HWND;
+
+PROCEDURE WinQueryWindowDC
+( WinHandle               : HWND
+)                         : HDC;
+
+PROCEDURE WinGetScreenPS
+( DesktopWinHandle        : HWND
+)                         : HPS;
+
+PROCEDURE WinLockWindowUpdate
+( DesktopWinHandle        : HWND;
+  LockUpdateWinHandle     : HWND
+)                         : BOOLEAN;
+
+PROCEDURE WinLockVisRegions
+( DesktopWinHandle        : HWND;
+  Lock                    : BOOLEAN
+)                         : BOOLEAN;
+
+PROCEDURE WinQueryUpdateRect
+( WinHandle               : HWND;
+  VAR Rectangle           : RECTL
+)                         : BOOLEAN;
+
+PROCEDURE WinQueryUpdateRegion
+( WinHandle               : HWND;
+  RegionHandle            : HRGN
+)                         : LONGINT;
+
+PROCEDURE WinExcludeUpdateRegion
+( PresSpaceHandle         : HPS;
+  WinHandle               : HWND
+)                         : LONGINT;
+
+CONST
+  WM_QUERYCONVERTPOS      = 00B0H;   (* WM_DBCSFIRST *)
+
+CONST (* Return values for WM_QUERYCONVERTPOS *)
+  QCP_CONVERT             = 0001H;
+  QCP_NOCONVERT           = 0000H;
+
+END WINWINDOWMGR.

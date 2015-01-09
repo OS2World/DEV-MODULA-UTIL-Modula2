@@ -1,0 +1,288 @@
+DEFINITION MODULE WINDIALOGS;
+
+(************************************************************************
+  OS/2 2.0 interface for Presentation Manager
+           dialog boxes.
+
+           Aug 15, 1995 : WinLoadDlg() and WinDlgBox() changed
+
+  Copyright (c) 1992 by Juergen Neuhoff
+*************************************************************************)
+
+(*$XL+       Modula-2 language extensions: '_' allowed for symbol names *)
+(*$CDECL+    C-style procedures                                         *)
+(*$A         default alignment for record fields                        *)
+
+IMPORT SYSTEM;
+FROM   OS2DEF        IMPORT TYPEPREFIX, HWND, HMODULE, POINTL;
+FROM   WINDEF        IMPORT PFNWP, MPARAM, MRESULT;
+FROM   WINMESSAGEMGR IMPORT QMSG;
+
+
+PROCEDURE WinGetDlgMsg
+( DlgWinHandle          : HWND;
+  VAR QueueMessage      : QMSG
+)                       : BOOLEAN;
+
+PROCEDURE WinLoadDlg
+( ParentWinHandle       : HWND;
+  OwnerWinHandle        : HWND;
+  DlgProc               : PFNWP;
+  ResourceId            : HMODULE;
+  DlgId                 : LONGCARD;
+  CreateParams          : SYSTEM.ADDRESS
+)                       : HWND;
+
+PROCEDURE WinDlgBox
+( ParentWinHandle       : HWND;
+  OwnerWinHandle        : HWND;
+  DlgProc               : PFNWP;
+  ResourceId            : HMODULE;
+  DlgId                 : LONGCARD;
+  CreatParams           : SYSTEM.ADDRESS
+)                       : LONGCARD;
+
+PROCEDURE WinDismissDlg
+( DlgWinHandle          : HWND;
+  Result                : LONGCARD
+)                       : BOOLEAN;
+
+PROCEDURE WinQueryDlgItemShort
+( ParentWinHandle       : HWND;
+  ItemId                : LONGCARD;
+  VAR Result            : INTEGER;
+  Signed                : BOOLEAN
+)                       : BOOLEAN;
+
+PROCEDURE WinSetDlgItemShort
+( ParentWinHandle       : HWND;
+  ItemId                : LONGCARD;
+  Value                 : CARDINAL;
+  Signed                : BOOLEAN
+)                       : BOOLEAN;
+
+PROCEDURE WinSetDlgItemText
+( ParentWinHandle       : HWND;
+  ItemId                : LONGCARD;
+  Text                  : ARRAY OF CHAR
+)                       : BOOLEAN;
+
+PROCEDURE WinQueryDlgItemText
+( ParentWinHandle       : HWND;
+  ItemId                : LONGCARD;
+  TextMax               : LONGINT;
+  VAR Text              : ARRAY OF CHAR
+)                       : LONGCARD;
+
+PROCEDURE WinQueryDlgItemTextLength
+( ParentWinHandle       : HWND;
+  ItemId                : LONGCARD
+)                       : LONGINT;
+
+PROCEDURE WinDefDlgProc
+( DlgWinHandle          : HWND;
+  MsgId                 : LONGCARD;
+  Param1                : MPARAM;
+  Param2                : MPARAM
+)                       : MRESULT;
+
+CONST (* Special item IDs *)
+  DID_OK      = 1;
+  DID_CANCEL  = 2;
+  DID_ERROR   = 0FFFFH;
+
+PROCEDURE WinAlarm
+( DesktopWinHandle      : HWND;
+  Style                 : LONGCARD
+)                       : BOOLEAN;
+
+CONST (* WinAlarm() Codes *)
+  WA_WARNING            = 0;
+  WA_NOTE               = 1;
+  WA_ERROR              = 2;
+  WA_CWINALARMS         = 3;    (* count of valid alarms *)
+
+PROCEDURE WinMessageBox
+( ParentWinHandle       : HWND;
+  OwnerWinHandle        : HWND;
+  Text                  : ARRAY OF CHAR;
+  Title                 : ARRAY OF CHAR;
+  WindowId              : CARDINAL;
+  Style                 : LONGCARD
+)                       : LONGCARD;
+
+CONST (* Message box types *)
+  MB_OK                 = 0000H;
+  MB_OKCANCEL           = 0001H;
+  MB_RETRYCANCEL        = 0002H;
+  MB_ABORTRETRYIGNORE   = 0003H;
+  MB_YESNO              = 0004H;
+  MB_YESNOCANCEL        = 0005H;
+  MB_CANCEL             = 0006H;
+  MB_ENTER              = 0007H;
+  MB_ENTERCANCEL        = 0008H;
+  MB_NOICON             = 0000H;
+  MB_CUANOTIFICATION    = 0000H;
+  MB_ICONQUESTION       = 0010H;
+  MB_ICONEXCLAMATION    = 0020H;
+  MB_CUAWARNING         = 0020H;
+  MB_ICONASTERISK       = 0030H;
+  MB_ICONHAND           = 0040H;
+  MB_CUACRITICAL        = 0040H;
+  MB_QUERY              = MB_ICONQUESTION;
+  MB_WARNING            = MB_CUAWARNING;
+  MB_INFORMATION        = MB_ICONASTERISK;
+  MB_CRITICAL           = MB_CUACRITICAL;
+  MB_ERROR              = MB_CRITICAL;
+  MB_DEFBUTTON1         = 0000H;
+  MB_DEFBUTTON2         = 0100H;
+  MB_DEFBUTTON3         = 0200H;
+  MB_APPLMODAL          = 0000H;
+  MB_SYSTEMMODAL        = 1000H;
+  MB_HELP               = 2000H;
+  MB_MOVEABLE           = 4000H;
+
+CONST (* Message box return codes *)
+  MBID_OK               = 1;
+  MBID_CANCEL           = 2;
+  MBID_ABORT            = 3;
+  MBID_RETRY            = 4;
+  MBID_IGNORE           = 5;
+  MBID_YES              = 6;
+  MBID_NO               = 7;
+  MBID_HELP             = 8;
+  MBID_ENTER            = 9;
+  MBID_ERROR            = 0FFFFH;
+
+CONST (* Dialog codes: returned by WM_QUERYDLGCODE msg     *)
+  DLGC_ENTRYFIELD  = 0001H;  (* Entry field item understands EM_SETSEL) *)
+  DLGC_BUTTON      = 0002H;  (* Button item                             *)
+  DLGC_RADIOBUTTON = 0004H;  (* Radio button                            *)
+  DLGC_STATIC      = 0008H;  (* Static item                             *)
+  DLGC_DEFAULT     = 0010H;  (* Default push button                     *)
+  DLGC_PUSHBUTTON  = 0020H;  (* Normal (Non-default) push button        *)
+  DLGC_CHECKBOX    = 0040H;  (* Check box button control                *)
+  DLGC_SCROLLBAR   = 0080H;  (* Scroll bar                              *)
+  DLGC_MENU        = 0100H;  (* Menu                                    *)
+  DLGC_TABONCLICK  = 0200H;
+  DLGC_MLE         = 0400H;  (* Multiple Line Entry                     *)
+
+PROCEDURE WinProcessDlg
+( DlgWinHandle          : HWND
+)                       : LONGCARD;
+
+PROCEDURE WinSendDlgItemMsg
+( ParentWinHandle       : HWND;
+  ItemId                : LONGCARD;
+  MsgId                 : LONGCARD;
+  Param1                : MPARAM;
+  Param2                : MPARAM
+)                       : MRESULT;
+
+PROCEDURE WinMapDlgPoints
+( DlgWinHandle          : HWND;
+  VAR Points            : ARRAY OF POINTL;
+  Count                 : LONGCARD;
+  Options               : BOOLEAN
+)                       : BOOLEAN;
+
+PROCEDURE WinEnumDlgItem
+( DlgWinHandle          : HWND;
+  ChildWinHandle        : HWND;
+  Code                  : LONGCARD
+)                       : HWND;
+
+PROCEDURE WinSubstituteStrings
+( WinHandle             : HWND;
+  Source                : ARRAY OF CHAR;
+  DestMax               : LONGINT;
+  VAR Dest              : ARRAY OF CHAR
+)                       : LONGINT;
+
+CONST (* WinEnumDlgItem() constants *)
+  EDI_FIRSTTABITEM      = 0;
+  EDI_LASTTABITEM       = 1;
+  EDI_NEXTTABITEM       = 2;
+  EDI_PREVTABITEM       = 3;
+  EDI_FIRSTGROUPITEM    = 4;
+  EDI_LASTGROUPITEM     = 5;
+  EDI_NEXTGROUPITEM     = 6;
+  EDI_PREVGROUPITEM     = 7;
+
+TYPE
+  (* Binary resources may be bound into application executables or *)
+  (* passed as a parameter when creating a window or dialog        *)
+  (* Currently they must be the same for both 16-bit and 32-bit    *)
+  (* so we pack the structures.                                    *)
+  (*$A2 WORD alignment for record fields *)
+  DLGTITEM              = RECORD
+    CASE                  : TYPEPREFIX OF
+    | TRUE                :
+      fsItemStatus        : CARDINAL;
+      cChildren           : CARDINAL;
+      cchClassName        : CARDINAL;
+      offClassName        : CARDINAL;
+      cchText             : CARDINAL;
+      offText             : CARDINAL;
+      flStyle             : LONGCARD;
+    | FALSE               :
+      ItemStatus          : CARDINAL;
+      ChildrenCount       : CARDINAL;
+      ClassNameSize       : CARDINAL;
+      ClassNameOffset     : CARDINAL;
+      TextSize            : CARDINAL;
+      TextOffset          : CARDINAL;
+      Style               : LONGCARD;
+    END;
+    x                     : INTEGER;
+    y                     : INTEGER;
+    CASE                  : TYPEPREFIX OF
+    | TRUE                :
+      cx                  : INTEGER;
+      cy                  : INTEGER;
+      id                  : CARDINAL;
+      offPresParams       : CARDINAL;
+      offCtlData          : CARDINAL;
+    | FALSE               :
+      xSize               : INTEGER;
+      ySize               : INTEGER;
+      Ident               : CARDINAL;
+      PresParamsOffset    : CARDINAL;
+      CtlDataOffset       : CARDINAL;
+    END;                  END;
+  (*$A restore default alignment for record fields *)
+  PDLGTITEM             = POINTER TO DLGTITEM;
+  (*$A2 WORD alignment for record fields *)
+  DLGTEMPLATE           = RECORD (* Dialog Template structure *)
+    CASE                  : TYPEPREFIX OF
+    | TRUE                :
+      cbTemplate          : CARDINAL;
+      type                : CARDINAL;
+      codepage            : CARDINAL;
+      offadlgti           : CARDINAL;
+      fsTemplateStatus    : CARDINAL;
+      iItemFocus          : CARDINAL;
+      coffPresParams      : CARDINAL;
+      adlgti              : ARRAY [0..0] OF DLGTITEM;
+    | FALSE               :
+      TemplateSize        : CARDINAL;
+      Type                : CARDINAL;
+      CodePage            : CARDINAL;
+      DlgItemOffset       : CARDINAL;
+      TemplateStatus      : CARDINAL;
+      ItemFocus           : CARDINAL;
+      PresParamsCntOffset : CARDINAL;
+      DlgItem             : ARRAY [0..0] OF DLGTITEM;
+    END;                  END;
+  PDLGTEMPLATE          = POINTER TO DLGTEMPLATE;
+  (*$A restore default alignment for record fields *)
+
+PROCEDURE WinCreateDlg
+( ParentWinHandle       : HWND;
+  OwnerWinHandle        : HWND;
+  DlgProc               : PFNWP;
+  VAR DialogTemplate    : DLGTEMPLATE;
+  VAR CreateParams      : ARRAY OF SYSTEM.BYTE
+)                       : HWND;
+
+END WINDIALOGS.

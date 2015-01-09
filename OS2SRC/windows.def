@@ -1,0 +1,73 @@
+DEFINITION MODULE Windows;
+
+(*************************************************************************
+   32-bit OS/2 Modula-2 standard windows.
+
+   Note: This definition is based upon N.Wirth's
+         "Programming in Modula-2" 4th edition;
+
+         Not yet implemented!
+
+   Copyright (c) 1995 by Juergen Neuhoff
+**************************************************************************)
+
+
+CONST
+  Background  = 0;
+  FirstWindow = 1;
+  LastWindow  = 8;
+
+TYPE
+  Window      = [Background..LastWindow];
+  RestoreProc = PROCEDURE( Window );
+
+PROCEDURE OpenWindow
+(
+  VAR u    : Window;
+  x,y,w,h  : CARDINAL;
+  Repaint  : RestoreProc;
+  VAR done : BOOLEAN
+);
+(* Open a new window, Repaint will be invoked to restore *)
+
+PROCEDURE DrawTitle
+(
+  u        : Window;
+  title    : ARRAY OF CHAR
+);
+
+PROCEDURE RedefineWindow
+(
+  u        : Window;
+  x,y,w,h  : CARDINAL;
+  VAR done : BOOLEAN
+);
+
+PROCEDURE CloseWindow
+(
+  u        : Window
+);
+
+PROCEDURE PlaceOnTop
+(
+  u        : Window
+);
+
+PROCEDURE PlaceOnBottom
+(
+  u        : Window
+);
+
+PROCEDURE OnTop
+(
+  u        : Window
+)          : BOOLEAN;
+
+PROCEDURE UpWindow
+(
+  x,y      : CARDINAL
+)          : Window;
+(* Return window or Background corresponding to screen coordinates (x,y) *)
+
+
+END Windows.

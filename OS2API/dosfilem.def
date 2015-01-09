@@ -1,0 +1,1123 @@
+DEFINITION MODULE DOSFILEMGR;
+
+(************************************************************************
+  OS/2 2.1 File Manager Interface.
+           01.06.95 14.24 : DosFindNext() changed
+           08.08.95 12.02 : DosCreateDir() changed
+
+  Copyright (c) 1992,1994 by Juergen Neuhoff
+*************************************************************************)
+
+(*$XL+       Modula-2 language extensions: '_' allowed for symbol names *)
+(*$CDECL+    C-style procedures                                         *)
+(*$A         default alignment for record fields                        *)
+
+IMPORT SYSTEM;
+FROM   OS2DEF IMPORT APIRET, LHANDLE, CCHMAXPATHCOMP, TYPEPREFIX, BOOL32;
+FROM   OS2DEF IMPORT FHLOCK;
+
+CONST
+  STDIN          = 0;
+  STDOUT         = 1;
+  STDERR         = 2;
+
+CONST (* DosSetFilePtr() file position codes *)
+  FILE_BEGIN      = 0000H; (* Move relative to beginning of file *)
+  FILE_CURRENT    = 0001H; (* Move relative to current fptr position *)
+  FILE_END        = 0002H; (* Move relative to end of file *)
+
+CONST (* DosFindFirst/Next Directory handle types *)
+  HDIR_SYSTEM     =  1;    (* Use system handle (1) *)
+  HDIR_CREATE     = -1;    (* Allocate a new, unused handle *)
+
+CONST (* DosCopy control bits; may be or'ed together *)
+  DCPY_EXISTING   = 0001H; (* Copy even if target exists *)
+  DCPY_APPEND     = 0002H; (* Append to existing file, do not replace *)
+  DCPY_FAILEAS    = 0004H; (* Fail if EAs not supported on target*)
+
+CONST (* DosOpen/DosQFHandState/DosQueryFileInfo et al file attributes;
+         also known as Dos File Mode bits...
+      *)
+  FILE_NORMAL     = 0000H;
+  FILE_READONLY   = 0001H;
+  FILE_HIDDEN     = 0002H;
+  FILE_SYSTEM     = 0004H;
+  FILE_DIRECTORY  = 0010H;
+  FILE_ARCHIVED   = 0020H;
+
+  FILE_IGNORE     = 10000H;   (* ignore file attribute in *)
+                              (* DosSetPath/File Info if *)
+                              (* this bit is set*)
+
+  MUST_HAVE_READONLY    = ( (FILE_READONLY  SHL 8) OR FILE_READONLY  );
+  MUST_HAVE_HIDDEN      = ( (FILE_HIDDEN    SHL 8) OR FILE_HIDDEN    );
+  MUST_HAVE_SYSTEM      = ( (FILE_SYSTEM    SHL 8) OR FILE_SYSTEM    );
+  MUST_HAVE_DIRECTORY   = ( (FILE_DIRECTORY SHL 8) OR FILE_DIRECTORY );
+  MUST_HAVE_ARCHIVED    = ( (FILE_ARCHIVED  SHL 8) OR FILE_ARCHIVED  );
+
+CONST (* DosOpen() actions *)
+  FILE_EXISTED    = 0001H;
+  FILE_CREATED    = 0002H;
+  FILE_TRUNCATED  = 0003H;
+
+CONST (* DosOpen() open flags *)
+  FILE_OPEN       = 0001H;
+  FILE_TRUNCATE   = 0002H;
+  FILE_CREATE     = 0010H;
+
+  (*         this nibble applies if file already exists    xxxx *)
+  OPEN_ACTION_FAIL_IF_EXISTS   = 0000H;  (* ---- ---- ---- 0000 *)
+  OPEN_ACTION_OPEN_IF_EXISTS   = 0001H;  (* ---- ---- ---- 0001 *)
+  OPEN_ACTION_REPLACE_IF_EXISTS= 0002H;  (* ---- ---- ---- 0010 *)
+
+  (*      this nibble applies if file does not exist  xxxx      *)
+  OPEN_ACTION_FAIL_IF_NEW      = 0000H;  (* ---- ---- 0000 ---- *)
+  OPEN_ACTION_CREATE_IF_NEW    = 0010H;  (* ---- ---- 0001 ---- *)
+
+CONST (* DosOpen/DosSetFHandState flags *)
+  OPEN_ACCESS_READONLY        =  0000H;  (* ---- ---- ---- -000 *)
+  OPEN_ACCESS_WRITEONLY       =  0001H;  (* ---- ---- ---- -001 *)
+  OPEN_ACCESS_READWRITE       =  0002H;  (* ---- ---- ---- -010 *)
+  OPEN_SHARE_DENYREADWRITE    =  0010H;  (* ---- ---- -001 ---- *)
+  OPEN_SHARE_DENYWRITE        =  0020H;  (* ---- ---- -010 ---- *)
+  OPEN_SHARE_DENYREAD         =  0030H;  (* ---- ---- -011 ---- *)
+  OPEN_SHARE_DENYNONE         =  0040H;  (* ---- ---- -100 ---- *)
+  OPEN_FLAGS_NOINHERIT        =  0080H;  (* ---- ---- 1--- ---- *)
+  OPEN_FLAGS_NO_LOCALITY      =  0000H;  (* ---- -000 ---- ---- *)
+  OPEN_FLAGS_SEQUENTIAL       =  0100H;  (* ---- -001 ---- ---- *)
+  OPEN_FLAGS_RANDOM           =  0200H;  (* ---- -010 ---- ---- *)
+  OPEN_FLAGS_RANDOMSEQUENTIAL =  0300H;  (* ---- -011 ---- ---- *)
+  OPEN_FLAGS_NO_CACHE         =  1000H;  (* ---1 ---- ---- ---- *)
+  OPEN_FLAGS_FAIL_ON_ERROR    =  2000H;  (* --1- ---- ---- ---- *)
+  OPEN_FLAGS_WRITE_THROUGH    =  4000H;  (* -1-- ---- ---- ---- *)
+  OPEN_FLAGS_DASD             =  8000H;  (* 1--- ---- ---- ---- *)
+  OPEN_FLAGS_NONSPOOLED       = 40000H;
+
+
+(*
+  EA Info Levels & Find First/Next
+  =========================================
+  API's: DosFindFirst, DosQueryFileInfo, DosQueryPathInfo, DosSetFileInfo,
+         DosSetPathInfo
+*)
+
+CONST (* File info levels&gml All listed API's *)
+  FIL_STANDARD        = 1;    (* Info level 1, standard file info *)
+  FIL_QUERYEASIZE     = 2;    (* Level 2, return Full EA size *)
+  FIL_QUERYEASFROMLIST= 3;    (* Level 3, return requested EA's *)
+
+CONST (* File info levels: Dos...PathInfo only *)
+  FIL_QUERYFULLNAME   = 5;    (* Level 5, return fully qualified
+                                           name of file *)
+
+
+CONST (* DosFsAttach() OpFlag *)
+  FS_ATTACH           = 0;    (* Attach file server *)
+  FS_DETACH           = 1;    (* Detach file server *)
+  FS_SPOOLATTACH      = 2;    (* Register a spooler device *)
+  FS_SPOOLDETACH      = 3;    (* De-register a spooler device *)
+
+
+CONST (* DosFsCtl() RouteMethod *)
+  FSCTL_HANDLE        = 1;    (* File Handle directs req routing *)
+  FSCTL_PATHNAME      = 2;    (* Path Name directs req routing *)
+  FSCTL_FSDNAME       = 3;    (* FSD Name directs req routing *)
+
+CONST (* DosFSCtl() FunctionCode *)
+  FSCTL_ERROR_INFO    = 1;    (* return error info from FSD *)
+  FSCTL_MAX_EASIZE    = 2;    (* Max ea size for the FSD *)
+
+TYPE (* structure for FSCTL fn 2 - maximum extende attribute size *)
+  EASIZEBUF           = RECORD
+    CASE                : TYPEPREFIX OF
+    | FALSE             :
+      cbMaxEASize       : CARDINAL; (* max. size of one EA *)
+      cbMaxEAListSize   : LONGCARD; (* max size of the full EA List *)
+    | TRUE              :
+      MaxEASize         : CARDINAL; (* max. size of one EA *)
+      MaxEAListSize     : LONGCARD; (* max size of the full EA List *)
+    END;                END;
+  PEASIZEBUF          = POINTER TO EASIZEBUF;
+
+
+CONST (* DosQueryFSAttach() *)
+      (* Information level types (defines method of query) *)
+  FSAIL_QUERYNAME     = 1;    (* Return data for a Drive or Device *)
+  FSAIL_DEVNUMBER     = 2;    (* Return data for Ordinal Device # *)
+  FSAIL_DRVNUMBER     = 3;    (* Return data for Ordinal Drive # *)
+
+CONST (* Item types (from data structure item "Type") *)
+  FSAT_CHARDEV        = 1;    (* Resident character device *)
+  FSAT_PSEUDODEV      = 2;    (* Pusedu-character device *)
+  FSAT_LOCALDRV       = 3;    (* Local drive *)
+  FSAT_REMOTEDRV      = 4;    (* Remote drive attached to FSD *)
+
+TYPE (* fsqbuf Data structure for QFSAttach*)
+  FSQBUFFER    = RECORD
+    CASE         : TYPEPREFIX OF
+    | FALSE      :
+      Type       : CARDINAL;             (* Item type *)
+      NameLen    : CARDINAL;             (* Length of item name, sans NULL *)
+      Name       : ARRAY [0..0] OF CHAR; (* ASCIIZ item name *)
+      FSDNameLen : CARDINAL;             (* Length of FSD name, sans NULL *)
+      FSDName    : ARRAY [0..0] OF CHAR; (* ASCIIZ FSD name *)
+      FSADataLen : CARDINAL;             (* Len of FSD Attach data returned *)
+      FSAData    : ARRAY [0..0] OF CHAR; (* FSD Attach data from FSD *)
+    | TRUE       :
+      iType      : CARDINAL;             (* Item type *)
+      cbName     : CARDINAL;             (* Length of item name, sans NULL *)
+      szName     : ARRAY [0..0] OF CHAR; (* ASCIIZ item name *)
+      cbFSDName  : CARDINAL;             (* Length of FSD name, sans NULL *)
+      szFSDName  : ARRAY [0..0] OF CHAR; (* ASCIIZ FSD name *)
+      cbFSAData  : CARDINAL;             (* Len of FSD Attach data returned *)
+      rgFSAData  : ARRAY [0..0] OF CHAR; (* FSD Attach data from FSD *)
+    END;         END;
+  PFSQBUFFER   = POINTER TO FSQBUFFER;
+
+TYPE (* fsqbuf Data structure for QFSAttach*)
+  FSQBUFFER2   = RECORD
+    CASE         : TYPEPREFIX OF
+    | FALSE      :
+      Type       : CARDINAL;
+      NameLen    : CARDINAL;
+      FSDNameLen : CARDINAL;
+      FSADataLen : CARDINAL;
+      Name       : ARRAY [0..0] OF CHAR;
+      FSDName    : ARRAY [0..0] OF CHAR;
+      FSAData    : ARRAY [0..0] OF CHAR;
+    | TRUE       :
+      iType      : CARDINAL;
+      cbName     : CARDINAL;
+      cbFSDName  : CARDINAL;
+      cbFSAData  : CARDINAL;
+      szName     : ARRAY [0..0] OF CHAR;
+      szFSDName  : ARRAY [0..0] OF CHAR;
+      rgFSAData  : ARRAY [0..0] OF CHAR;
+    END;         END;
+  PFSQBUFFER2  = POINTER TO PFSQBUFFER2;
+
+TYPE (* Data structure for spooler operations *)
+  SPOOLATTACH  = RECORD
+    CASE         : TYPEPREFIX OF
+    | FALSE      :
+      NmPipe     : CARDINAL;    (* Named pipe handle *)
+      Key        : LONGCARD;    (* Attached key *)
+    | TRUE       :
+      hNmPipe    : CARDINAL;    (* Named pipe handle *)
+      ulKey      : LONGCARD;    (* Attached key *)
+    END;         END;
+  PSPOOLATTACH = POINTER TO SPOOLATTACH;
+
+TYPE (* Spool attach data buffer *)
+  SPOOLATTACH2  = RECORD
+    CASE          : TYPEPREFIX OF
+    | FALSE       :
+      NmPipe      : CARDINAL;     (* handle if named pipe opened by spooler *)
+      Filler      : CARDINAL;
+      SpoolObjLen : SHORTCARD;    (* length of name of spooler object *)
+      SpoolObj    : ARRAY [0..0] OF CHAR; (* var.len. name of spooler object *)
+    | TRUE        :
+      hNmPipe     : CARDINAL;     (* handle if named pipe opened by spooler *)
+      filler      : CARDINAL;
+      cbSpoolObj  : SHORTCARD;    (* length of name of spooler object *)
+      szSpoolObj  : ARRAY [0..0] OF CHAR; (* var.len. name of spooler object *)
+    END;          END;
+  PSPOOLATTACH2 = POINTER TO SPOOLATTACH2;
+
+CONST (* File System Drive Info Levels for DosQueryFSInfo() DosSetFSInfo() *)
+  FSIL_ALLOC          = 1;    (* Drive allocation info (Query only) *)
+  FSIL_VOLSER         = 2;    (* Drive Volum/Serial info *)
+
+CONST (* DosQueryFHType() *)
+      (* Handle classes (low 8 bits of Handle Type) *)
+  FHT_DISKFILE        = 0000H;   (* Disk file handle *)
+  FHT_CHRDEV          = 0001H;   (* Character device handle *)
+  FHT_PIPE            = 0002H;   (* Pipe handle *)
+      (* Handle bits (high 8 bits of Handle Type) *)
+  FHB_DSKREMOTE       = 8000H;   (* Remote disk *)
+  FHB_CHRDEVREMOTE    = 8000H;   (* Remote character device *)
+  FHB_PIPEREMOTE      = 8000H;   (* Remote pipe *)
+
+TYPE (* File time and date types *)
+  FTIME   = CARDINAL;            (* hhhh hmmm mmms ssss *)
+  PFTIME  = POINTER TO FTIME;
+  FDATE   = CARDINAL;            (* yyyy yyym mmmd dddd *)
+  PFDATE  = POINTER TO FDATE;
+
+TYPE
+  VOLUMELABEL  = RECORD           (* Volume label record *)
+    CASE         : TYPEPREFIX OF
+    | FALSE      :
+      LabelLen   : SHORTCARD;        (* length of label sans NULL *)
+      Label      : ARRAY [0..11] OF CHAR;
+    | TRUE       :
+      cch        : SHORTCARD;        (* length of label sans NULL *)
+      szVolLabel : ARRAY [0..11] OF CHAR;
+    END;         END;
+  PVOLUMELABEL = POINTER TO PVOLUMELABEL;
+
+TYPE
+  FSINFO          = RECORD         (* file system info record *)
+    CASE            : TYPEPREFIX OF
+    | FALSE         :
+      CreationDate  : FDATE;       (* file creation date *)
+      CreationTime  : FTIME;       (* file creation time *)
+      Vol           : VOLUMELABEL; (* volume label name *)
+    | TRUE          :
+      fdateCreation : FDATE;       (* file creation date *)
+      ftimeCreation : FTIME;       (* file creation time *)
+      vol           : VOLUMELABEL; (* volume label name *)
+    END;            END;
+  PFSINFO         = POINTER TO FSINFO;
+
+CONST (* HANDTYPE values *)
+  HANDTYPE_FILE       = 0000H;
+  HANDTYPE_DEVICE     = 0001H;
+  HANDTYPE_PIPE       = 0002H;
+  HANDTYPE_NETWORK    = 8000H;
+
+TYPE
+  FILELOCK  = RECORD
+    CASE      : TYPEPREFIX OF
+    | FALSE   :
+      Offset  : LONGINT;
+      Range   : LONGINT;
+    | TRUE    :
+      lOffset : LONGINT;
+      lRange  : LONGINT;
+    END;      END;
+  PFILELOCK = POINTER TO FILELOCK;
+  HFILE     = LHANDLE;
+  PHFILE    = POINTER TO HFILE;
+  HEV       = LONGCARD;
+  PHEV      = POINTER TO HEV;
+
+TYPE (* buffer types for DosFindFirst() DosFindNext() ... *)
+  FILEFINDBUF        = RECORD
+    CASE               : TYPEPREFIX OF
+    | FALSE            :
+      CreationDate     : FDATE;
+      CreationTime     : FTIME;
+      LastAccessDate   : FDATE;
+      LastAccessTime   : FTIME;
+      LastWriteDate    : FDATE;
+      LastWriteTime    : FTIME;
+      FileSize         : LONGCARD;
+      FileAllocSize    : LONGCARD;
+      FileAttr         : CARDINAL;
+      NameLen          : SHORTCARD;
+      Name             : ARRAY [0..CCHMAXPATHCOMP-1] OF CHAR;
+    | TRUE             :
+      fdateCreation    : FDATE;
+      ftimeCreation    : FTIME;
+      fdateLastAccess  : FDATE;
+      ftimeLastAccess  : FTIME;
+      fdateLastWrite   : FDATE;
+      ftimeLastWrite   : FTIME;
+      cbFile           : LONGCARD;
+      cbFileAlloc      : LONGCARD;
+      attrFile         : CARDINAL;
+      cchName          : SHORTCARD;
+      achName          : ARRAY [0..CCHMAXPATHCOMP-1] OF CHAR;
+    END;
+    filler             : SYSTEM.BYTE;
+                       END;
+  PFILEFINDBUF       = POINTER TO FILEFINDBUF;
+  (*$A2 WORD alignment for record fields >= 2 bytes *)
+  FILEFINDBUF2       = RECORD
+    CASE               : TYPEPREFIX OF
+    | FALSE            :
+      CreationDate     : FDATE;
+      CreationTime     : FTIME;
+      LastAccessDate   : FDATE;
+      LastAccessTime   : FTIME;
+      LastWriteDate    : FDATE;
+      LastWriteTime    : FTIME;
+      FileSize         : LONGCARD;
+      FileAllocSize    : LONGCARD;
+      FileAttr         : CARDINAL;
+      ListSize         : LONGCARD;
+      NameLen          : SHORTCARD;
+      Name             : ARRAY [0..CCHMAXPATHCOMP-1] OF CHAR;
+    | TRUE             :
+      fdateCreation    : FDATE;
+      ftimeCreation    : FTIME;
+      fdateLastAccess  : FDATE;
+      ftimeLastAccess  : FTIME;
+      fdateLastWrite   : FDATE;
+      ftimeLastWrite   : FTIME;
+      cbFile           : LONGCARD;
+      cbFileAlloc      : LONGCARD;
+      attrFile         : CARDINAL;
+      cbList           : LONGCARD;
+      cchName          : SHORTCARD;
+      achName          : ARRAY [0..CCHMAXPATHCOMP-1] OF CHAR;
+    END;
+    filler             : SYSTEM.BYTE;
+                       END;
+  (*$A default alignment for record fields *)
+  PFILEFINDBUF2      = POINTER TO FILEFINDBUF2;
+  FILEFINDBUF3       = RECORD
+    CASE               : TYPEPREFIX OF
+    | FALSE            :
+      NextEntryOffset  : LONGCARD;
+      CreationDate     : FDATE;
+      CreationTime     : FTIME;
+      LastAccessDate   : FDATE;
+      LastAccessTime   : FTIME;
+      LastWriteDate    : FDATE;
+      LastWriteTime    : FTIME;
+      FileSize         : LONGCARD;
+      FileAllocSize    : LONGCARD;
+      FileAttr         : LONGCARD;
+      NameLen          : SHORTCARD;
+      Name             : ARRAY [0..CCHMAXPATHCOMP-1] OF CHAR;
+    | TRUE             :
+      oNextEntryOffset : LONGCARD;
+      fdateCreation    : FDATE;
+      ftimeCreation    : FTIME;
+      fdateLastAccess  : FDATE;
+      ftimeLastAccess  : FTIME;
+      fdateLastWrite   : FDATE;
+      ftimeLastWrite   : FTIME;
+      cbFile           : LONGCARD;
+      cbFileAlloc      : LONGCARD;
+      attrFile         : LONGCARD;
+      cchName          : SHORTCARD;
+      achName          : ARRAY [0..CCHMAXPATHCOMP-1] OF CHAR;
+    END;
+    filler             : ARRAY [0..2] OF SYSTEM.BYTE;
+                       END;
+  PFILEFINDBUF3      = POINTER TO FILEFINDBUF3;
+  FILEFINDBUF4       = RECORD
+    CASE               : TYPEPREFIX OF
+    | FALSE            :
+      NextEntryOffset  : LONGCARD;
+      CreationDate     : FDATE;
+      CreationTime     : FTIME;
+      LastAccessDate   : FDATE;
+      LastAccessTime   : FTIME;
+      LastWriteDate    : FDATE;
+      LastWriteTime    : FTIME;
+      FileSize         : LONGCARD;
+      FileAllocSize    : LONGCARD;
+      FileAttr         : LONGCARD;
+      ListSize         : LONGCARD;
+      NameLen          : SHORTCARD;
+      Name             : ARRAY [0..CCHMAXPATHCOMP-1] OF CHAR;
+    | TRUE             :
+      oNextEntryOffset : LONGCARD;
+      fdateCreation    : FDATE;
+      ftimeCreation    : FTIME;
+      fdateLastAccess  : FDATE;
+      ftimeLastAccess  : FTIME;
+      fdateLastWrite   : FDATE;
+      ftimeLastWrite   : FTIME;
+      cbFile           : LONGCARD;
+      cbFileAlloc      : LONGCARD;
+      attrFile         : LONGCARD;
+      cbList           : LONGCARD;
+      cchName          : SHORTCARD;
+      achName          : ARRAY [0..CCHMAXPATHCOMP-1] OF CHAR;
+    END;
+    filler             : ARRAY [0..2] OF SYSTEM.BYTE;
+                      END;
+  PFILEFINDBUF4     = POINTER TO FILEFINDBUF4;
+
+TYPE (* extended attribute structures *)
+  PGEA       = POINTER TO GEA;
+  PGEALIST   = POINTER TO GEALIST;
+  PFEA       = POINTER TO FEA;
+  PFEALIST   = POINTER TO FEALIST;
+  PEAOP      = POINTER TO PEAOP;
+  PFEA2      = POINTER TO FEA2;
+  PFEA2LIST  = POINTER TO FEA2LIST;
+  PGEA2      = POINTER TO GEA2;
+  PGEA2LIST  = POINTER TO GEA2LIST;
+  PEAOP2     = POINTER TO EAOP2;
+  GEA        = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      NameLen  : SHORTCARD;            (* name length not including NULL *)
+      Name     : ARRAY [0..0] OF CHAR; (* attribute name *)
+    | TRUE     :
+      cbName   : SHORTCARD;            (* name length not including NULL *)
+      szName   : ARRAY [0..0] OF CHAR; (* attribute name *)
+    END;       END;
+  GEALIST    = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      ListSize : LONGCARD;             (* total record bytes incl. full list *)
+      List     : ARRAY [0..0] OF GEA;  (* variable length GEA structures *)
+    | TRUE     :
+      cbList   : LONGCARD;             (* total record bytes incl. full list *)
+      list     : ARRAY [0..0] OF GEA;  (* variable length GEA structures *)
+    END;       END;
+  FEA        = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      EA       : SHORTCARD;            (* flags *)
+      NameLen  : SHORTCARD;            (* name length not including NULL *)
+      ValueLen : CARDINAL;             (* value length *)
+    | TRUE     :
+      fEA      : SHORTCARD;            (* flags *)
+      cbName   : SHORTCARD;            (* name length not including NULL *)
+      cbValue  : CARDINAL;             (* value length *)
+    END;       END;
+  FEALIST    = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      ListSize : LONGCARD;             (* total record bytes incl. full list *)
+      List     : ARRAY [0..0] OF FEA;  (* variable length FEA records *)
+    | TRUE     :
+      cbList   : LONGCARD;             (* total record bytes incl. full list *)
+      list     : ARRAY [0..0] OF FEA;  (* variable length FEA records *)
+    END;       END;
+  EAOP       = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      GEAList  : PGEALIST; (* general EA list *)
+      FEAList  : PFEALIST; (* full EA list *)
+      Error    : LONGCARD;
+    | TRUE     :
+      fpGEAList: PGEALIST; (* general EA list *)
+      fpFEAList: PFEALIST; (* full EA list *)
+      oError   : LONGCARD;
+    END;       END;
+  FEA2       = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      NextEntryOffset : LONGCARD;
+      EA       : SHORTCARD;            (* flags *)
+      NameLen  : SHORTCARD;            (* name length excl. NULL *)
+      ValueLen : CARDINAL;             (* value length *)
+      Name     : ARRAY [0..0] OF CHAR;
+    | TRUE     :
+      oNextEntryOffset : LONGCARD;
+      fEA      : SHORTCARD;            (* flags *)
+      cbName   : SHORTCARD;            (* name length excl. NULL *)
+      cbValue  : CARDINAL;             (* value length *)
+      szName   : ARRAY [0..0] OF CHAR;
+    END;       END;
+  FEA2LIST   = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      ListSize : LONGCARD;
+      List     : ARRAY [0..0] OF FEA2;
+    | TRUE     :
+      cbList   : LONGCARD;
+      list     : ARRAY [0..0] OF FEA2;
+    END;       END;
+  GEA2       = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      NextEntryOffset : LONGCARD;
+      NameLen  : SHORTCARD;
+      Name     : ARRAY [0..0] OF CHAR;
+    | TRUE     :
+      oNextEntryOffset : LONGCARD;
+      cbName   : SHORTCARD;
+      szName   : ARRAY [0..0] OF CHAR;
+    END;       END;
+  GEA2LIST   = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      ListSize : LONGCARD;
+      List     : ARRAY [0..0] OF GEA2;
+    | TRUE     :
+      cbList   : LONGCARD;
+      list     : ARRAY [0..0] OF GEA2;
+    END;       END;
+  EAOP2      = RECORD
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      GEA2List : PGEA2LIST;         (* GEA set *)
+      FEA2List : PFEA2LIST;         (* FEA set *)
+      Error    : LONGCARD;          (* offset of FEA error *)
+    | TRUE     :
+      fpGEA2List : PGEA2LIST;       (* GEA set *)
+      fpFEA2List : PFEA2LIST;       (* FEA set *)
+      oError   : LONGCARD;          (* offset of FEA error *)
+    END;       END;
+
+CONST (* flags for FEA.EA *)
+  FEA_NEEDEA = 80H;                  (* need EA bit *)
+
+CONST
+  (*
+     Equates for the types of EAs that follow the convention that we have
+     established.
+
+     Values 0xFFFE thru 0x8000 are reserved.
+     Values 0x0000 thru 0x7fff are user definable.
+     Value  0xFFFC is not used
+  *)
+  EAT_BINARY   = 0FFFEH;    (* length preceeded binary *)
+  EAT_ASCII    = 0FFFDH;    (* length preceeded ASCII *)
+  EAT_BITMAP   = 0FFFBH;    (* length preceeded bitmap *)
+  EAT_METAFILE = 0FFFAH;    (* length preceeded metafile *)
+  EAT_ICON     = 0FFF9H;    (* length preceeded icon *)
+  EAT_EA       = 0FFEEH;    (* length preceeded ASCII *)
+                            (* name of associated data *)
+  EAT_MVMT     = 0FFDFH;    (* multi-valued, multi-typed field *)
+  EAT_MVST     = 0FFDEH;    (* multi-valued, single-typed field *)
+  EAT_ASN1     = 0FFDDH;    (* ASN.1 field *)
+
+TYPE (* File time and date types *)
+  FILESTATUS         = RECORD
+    CASE               : TYPEPREFIX OF
+    | FALSE            :
+      CreationDate     : FDATE;
+      CreationTime     : FTIME;
+      LastAccessDate   : FDATE;
+      LastAccessTime   : FTIME;
+      LastWriteDate    : FDATE;
+      LastWriteTime    : FTIME;
+      FileSize         : LONGCARD;
+      FileAllocSize    : LONGCARD;
+      FileAttr         : CARDINAL;
+    | TRUE             :
+      fdateCreation    : FDATE;
+      ftimeCreation    : FTIME;
+      fdateLastAccess  : FDATE;
+      ftimeLastAccess  : FTIME;
+      fdateLastWrite   : FDATE;
+      ftimeLastWrite   : FTIME;
+      cbFile           : LONGCARD;
+      cbFileAlloc      : LONGCARD;
+      attrFile         : CARDINAL;
+    END;
+    filler             : SYSTEM.WORD;
+                       END;
+  FILESTATUS2        = RECORD
+    CASE               : TYPEPREFIX OF
+    | FALSE            :
+      CreationDate     : FDATE;
+      CreationTime     : FTIME;
+      LastAccessDate   : FDATE;
+      LastAccessTime   : FTIME;
+      LastWriteDate    : FDATE;
+      LastWriteTime    : FTIME;
+      FileSize         : LONGCARD;
+      FileAllocSize    : LONGCARD;
+      FileAttr         : CARDINAL;
+      Filler           : SYSTEM.WORD;
+      ListSize         : LONGCARD;
+    | TRUE             :
+      fdateCreation    : FDATE;
+      ftimeCreation    : FTIME;
+      fdateLastAccess  : FDATE;
+      ftimeLastAccess  : FTIME;
+      fdateLastWrite   : FDATE;
+      ftimeLastWrite   : FTIME;
+      cbFile           : LONGCARD;
+      cbFileAlloc      : LONGCARD;
+      attrFile         : CARDINAL;
+      filler           : SYSTEM.WORD;
+      cbList           : LONGCARD;
+    END;               END;
+  FILESTATUS3        = RECORD
+    CASE               : TYPEPREFIX OF
+    | FALSE            :
+      CreationDate     : FDATE;
+      CreationTime     : FTIME;
+      LastAccessDate   : FDATE;
+      LastAccessTime   : FTIME;
+      LastWriteDate    : FDATE;
+      LastWriteTime    : FTIME;
+      FileSize         : LONGCARD;
+      FileAllocSize    : LONGCARD;
+      FileAttr         : LONGCARD;
+    | TRUE             :
+      fdateCreation    : FDATE;
+      ftimeCreation    : FTIME;
+      fdateLastAccess  : FDATE;
+      ftimeLastAccess  : FTIME;
+      fdateLastWrite   : FDATE;
+      ftimeLastWrite   : FTIME;
+      cbFile           : LONGCARD;
+      cbFileAlloc      : LONGCARD;
+      attrFile         : LONGCARD;
+    END;               END;
+  FILESTATUS4        = RECORD (* level 2 info for DosQueryFileInfo() *)
+    CASE               : TYPEPREFIX OF
+    | FALSE            :
+      CreationDate     : FDATE;
+      CreationTime     : FTIME;
+      LastAccessDate   : FDATE;
+      LastAccessTime   : FTIME;
+      LastWriteDate    : FDATE;
+      LastWriteTime    : FTIME;
+      FileSize         : LONGCARD;
+      FileAllocSize    : LONGCARD;
+      FileAttr         : LONGCARD;
+      ListSize         : LONGCARD;
+    | TRUE             :
+      fdateCreation    : FDATE;
+      ftimeCreation    : FTIME;
+      fdateLastAccess  : FDATE;
+      ftimeLastAccess  : FTIME;
+      fdateLastWrite   : FDATE;
+      ftimeLastWrite   : FTIME;
+      cbFile           : LONGCARD;
+      cbFileAlloc      : LONGCARD;
+      attrFile         : LONGCARD;
+      cbList           : LONGCARD;
+    END;               END;
+  FSALLOCATE         = RECORD     (* level 1 info for DosQueryFSInfo() *)
+    CASE               : TYPEPREFIX OF
+    | FALSE            :
+      FileSystemId     : LONGCARD;  (* File system ID *)
+      SectorsPerUnit   : LONGCARD;  (* Number of sectors per allocation unit *)
+      Units            : LONGCARD;  (* Number of allocation units *)
+      UnitsAvail       : LONGCARD;  (* Number of available allocation units *)
+      SectorSize       : CARDINAL;  (* Number of bytes per sector *)
+    | TRUE             :
+      idFileSystem     : LONGCARD;  (* File system ID *)
+      cSectorUnit      : LONGCARD;  (* Number of sectors per allocation unit *)
+      cUnit            : LONGCARD;  (* Number of allocation units *)
+      cUnitAvail       : LONGCARD;  (* Number of available allocation units *)
+      cbSector         : CARDINAL;  (* Number of bytes per sector *)
+    END;
+    filler             : SYSTEM.WORD;
+                       END;
+  PFILESTATUS        = POINTER TO FILESTATUS;
+  PFILESTATUS2       = POINTER TO FILESTATUS2;
+  PFILESTATUS3       = POINTER TO FILESTATUS3;
+  PFSALLOCATE        = POINTER TO FSALLOCATE;
+  HDIR               = LHANDLE;
+  PHDIR              = POINTER TO HDIR;
+
+TYPE
+  DENA1 = RECORD                     (* level 1 info DosEnumAttribute() *)
+    CASE       : TYPEPREFIX OF
+    | FALSE    :
+      Reserved : SYSTEM.BYTE;          (* 0 *)
+      NameLen  : SHORTCARD;            (* length of name exculding NULL *)
+      ValueLen : CARDINAL;             (* length of value *)
+      Name     : ARRAY [0..0] OF CHAR; (* variable length asciiz name *)
+    | TRUE     :
+      reserved : SYSTEM.BYTE;          (* 0 *)
+      cbName   : SHORTCARD;            (* length of name exculding NULL *)
+      cbValue  : CARDINAL;             (* length of value *)
+      szName   : ARRAY [0..0] OF CHAR; (* variable length asciiz name *)
+    END;       END;
+  PDENA1     = POINTER TO DENA1;
+  DENA2      = FEA2;
+  PDENA2     = PFEA2;
+
+CONST (* Infolevels for DosEnumAttribute()  *)
+  ENUMEA_LEVEL_NO_VALUE  = 1;      (* FEA without value *)
+
+CONST (* Reference types for DosEnumAttribute() *)
+  ENUMEA_REFTYPE_FHANDLE = 0;      (* file handle *)
+  ENUMEA_REFTYPE_PATH    = 1;      (* path name *)
+  ENUMEA_REFTYPE_MAX     = ENUMEA_REFTYPE_PATH;
+
+CONST (* for DosSetPathInfo() PathInfoFlags *)
+  DSPI_WRITTHRU    = 00000010H;
+
+
+(*************************************************************************
+  Directory Search Functions
+**************************************************************************)
+
+PROCEDURE DosFindFirst
+( FileName          : ARRAY OF CHAR;
+  VAR DirHandle     : HDIR;
+  Attribute         : LONGCARD;
+  VAR ResultBuf     : ARRAY OF SYSTEM.BYTE;
+  ResultBufLen      : LONGCARD;
+  VAR SearchCount   : LONGCARD;
+  FileInfoLevel     : LONGCARD
+)                   : APIRET;
+
+PROCEDURE DosFindNext
+( DirHandle         : HDIR;
+  VAR ResultBuf     : ARRAY OF SYSTEM.BYTE;
+  ResultBufLen      : LONGCARD;
+  VAR SearchCount   : LONGCARD
+)                   : APIRET;
+
+PROCEDURE DosFindClose
+( DirHandle         : HDIR
+)                   : APIRET;
+
+
+
+(*************************************************************************
+  File Functions
+*************************************************************************)
+
+PROCEDURE DosClose
+( FileHandle       : HFILE
+)                  : APIRET;
+
+PROCEDURE DosProtectClose
+( FileHandle       : HFILE;
+  FileHandleLockID : FHLOCK
+)                  : APIRET;
+
+PROCEDURE DosCopy
+( SourceName       : ARRAY OF CHAR;
+  TargetName       : ARRAY OF CHAR;
+  OpMode           : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosDelete
+( FileName         : ARRAY OF CHAR
+)                  : APIRET;
+
+PROCEDURE DosForceDelete
+( FileName         : ARRAY OF CHAR
+)                  : APIRET;
+
+PROCEDURE DosEditName
+( EditLevel        : LONGCARD;
+  SourceString     : ARRAY OF CHAR;
+  EditString       : ARRAY OF CHAR;
+  VAR TargetBuf    : ARRAY OF CHAR;
+  TargetBufLen     : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosMove
+( OldPathName      : ARRAY OF CHAR;
+  NewPathName      : ARRAY OF CHAR
+)                  : APIRET;
+
+PROCEDURE DosOpen
+( FileName         : ARRAY OF CHAR;
+  VAR FileHandle   : HFILE;
+  VAR ActionTaken  : LONGCARD;
+  FileSize         : LONGCARD;
+  FileAttribute    : LONGCARD;    (* see DosFindFirst Attribute *)
+  OpenFlag         : LONGCARD;
+  OpenMode         : LONGCARD;
+  EABuf            : PEAOP2
+)                  : APIRET;
+
+PROCEDURE DosProtectOpen
+( FileName         : ARRAY OF CHAR;
+  VAR FileHandle   : HFILE;
+  VAR ActionTaken  : LONGCARD;
+  FileSize         : LONGCARD;
+  FileAttribute    : LONGCARD;    (* see DosFindFirst Attribute *)
+  OpenFlag         : LONGCARD;
+  OpenMode         : LONGCARD;
+  EABuf            : PEAOP2;
+  FileHandleLockID : FHLOCK
+)                  : APIRET;
+
+PROCEDURE DosRead
+( FileHandle       : HFILE;
+  VAR BufferArea   : ARRAY OF SYSTEM.BYTE;
+  BufferLength     : LONGCARD;
+  VAR BytesRead    : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosProtectRead
+( FileHandle       : HFILE;
+  VAR BufferArea   : ARRAY OF SYSTEM.BYTE;
+  BufferLength     : LONGCARD;
+  VAR BytesRead    : LONGCARD;
+  FileHandleLockID : FHLOCK
+)                  : APIRET;
+
+PROCEDURE DosResetBuffer
+( FileHandle       : HFILE
+)                  : APIRET;
+
+PROCEDURE DosSetFileInfo
+( FileHandle       : HFILE;
+  FileInfoLevel    : LONGCARD; (* <=2, see DosFindFirst FileInfoLevel *)
+  VAR FileInfoBuf  : ARRAY OF SYSTEM.BYTE;
+  FileInfoBufSize  : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosProtectSetFileInfo
+( FileHandle       : HFILE;
+  FileInfoLevel    : LONGCARD; (* <=2, see DosFindFirst FileInfoLevel *)
+  VAR FileInfoBuf  : ARRAY OF SYSTEM.BYTE;
+  FileInfoBufSize  : LONGCARD;
+  FileHandleLockID : FHLOCK
+)                  : APIRET;
+
+PROCEDURE DosSetFileLocks
+( FileHandle       : HFILE;
+  VAR UnLockRange  : FILELOCK;
+  VAR LockRange    : FILELOCK;
+  TimeOut          : LONGCARD;
+  Flags            : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosProtectSetFileLocks
+( FileHandle       : HFILE;
+  VAR UnLockRange  : FILELOCK;
+  VAR LockRange    : FILELOCK;
+  TimeOut          : LONGCARD;
+  Flags            : LONGCARD;
+  FileHandleLockID : FHLOCK
+)                  : APIRET;
+
+PROCEDURE DosCancelLockRequest
+( FileHandle       : HFILE;
+  VAR LockRange    : FILELOCK
+)                  : APIRET;
+
+PROCEDURE DosSetFilePtr
+( FileHandle       : HFILE;
+  Distance         : LONGINT;
+  MoveType         : LONGCARD;
+  VAR NewPointer   : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosProtectSetFilePtr
+( FileHandle       : HFILE;
+  Distance         : LONGINT;
+  MoveType         : LONGCARD;
+  VAR NewPointer   : LONGCARD;
+  FileHandleLockID : FHLOCK
+)                  : APIRET;
+
+PROCEDURE DosSetFileSize
+( FileHandle       : HFILE;
+  FileSize         : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosProtectSetFileSize
+( FileHandle       : HFILE;
+  FileSize         : LONGCARD;
+  FileHandleLockID : FHLOCK
+)                  : APIRET;
+
+PROCEDURE DosSetVerify
+( VerifySetting    : BOOLEAN
+)                  : APIRET;
+
+PROCEDURE DosWrite
+( FileHandle       : HFILE;
+  BufferArea       : ARRAY OF SYSTEM.BYTE;
+  BufferLength     : LONGCARD;
+  VAR BytesWritten : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosProtectWrite
+( FileHandle       : HFILE;
+  BufferArea       : ARRAY OF SYSTEM.BYTE;
+  BufferLength     : LONGCARD;
+  VAR BytesWritten : LONGCARD;
+  FileHandleLockID : FHLOCK
+)                  : APIRET;
+
+
+(*************************************************************************
+  File Handle Functions
+**************************************************************************)
+
+PROCEDURE DosDupHandle
+( OldFileHandle     : HFILE;
+  VAR NewFileHandle : HFILE
+)                   : APIRET;
+
+PROCEDURE DosQueryFHState
+( FileHandle          : HFILE;
+  VAR FileHandleState : LONGCARD  (* see DosOpen OpenMode *)
+)                     : APIRET;
+
+PROCEDURE DosProtectQueryFHState
+( FileHandle          : HFILE;
+  VAR FileHandleState : LONGCARD; (* see DosOpen OpenMode *)
+  FileHandleLockID    : FHLOCK
+)                     : APIRET;
+
+PROCEDURE DosQueryHType
+( FileHandle        : HFILE;
+  VAR HandleType    : LONGCARD;
+  VAR FlagWord      : LONGCARD
+)                   : APIRET;
+
+PROCEDURE DosSetFHState
+( FileHandle        : HFILE;
+  FileHandleState   : LONGCARD    (* see DosOpen OpenMode *)
+)                   : APIRET;
+
+PROCEDURE DosProtectSetFHState
+( FileHandle        : HFILE;
+  FileHandleState   : LONGCARD;   (* see DosOpen OpenMode *)
+  FileHandleLockID  : FHLOCK
+)                   : APIRET;
+
+PROCEDURE DosSetMaxFH
+( NumberHandles     : LONGCARD
+)                   : APIRET;
+
+PROCEDURE DosSetRelMaxFH
+( VAR ReqCount      : LONGINT;
+  VAR CurMaxFH      : LONGCARD
+)                   : APIRET;
+
+
+(*************************************************************************
+  File Query Functions
+**************************************************************************)
+
+PROCEDURE DosEnumAttribute
+( RefType           : LONGCARD;
+  FileRef           : ARRAY OF SYSTEM.BYTE;
+  EntryNum          : LONGCARD;
+  VAR EnumBuf       : ARRAY OF SYSTEM.BYTE;
+  EnumBufSize       : LONGCARD;
+  VAR EnumCnt       : LONGCARD;
+  InfoLevel         : LONGCARD
+)                   : APIRET;
+
+PROCEDURE DosProtectEnumAttribute
+( RefType           : LONGCARD;
+  FileRef           : ARRAY OF SYSTEM.BYTE;
+  EntryNum          : LONGCARD;
+  VAR EnumBuf       : ARRAY OF SYSTEM.BYTE;
+  EnumBufSize       : LONGCARD;
+  VAR EnumCnt       : LONGCARD;
+  InfoLevel         : LONGCARD;
+  FileHandleLockID  : FHLOCK
+)                   : APIRET;
+
+
+(* DosQueryFileInfo() returning:
+     FILESTATUS3 if level 1
+     FILESTATUS4 if level 2
+     EAOP2       if level 3
+*)
+
+PROCEDURE DosQueryFileInfo
+( FileHandle        : HFILE;
+  FileInfoLevel     : LONGCARD;
+  VAR FileInfoBuf   : ARRAY OF SYSTEM.BYTE;
+  FileInfoBufSize   : LONGCARD
+)                   : APIRET;
+
+PROCEDURE DosProtectQueryFileInfo
+( FileHandle        : HFILE;
+  FileInfoLevel     : LONGCARD;
+  VAR FileInfoBuf   : ARRAY OF SYSTEM.BYTE;
+  FileInfoBufSize   : LONGCARD;
+  FileHandleLockID  : FHLOCK
+)                   : APIRET;
+
+PROCEDURE DosQueryVerify
+( VAR VerifySetting : BOOL32
+)                   : APIRET;
+
+
+(*************************************************************************
+  Directory and Disk Functions
+**************************************************************************)
+
+PROCEDURE DosCreateDir
+( DirName          : ARRAY OF CHAR;
+  EABuf            : PEAOP2
+)                  : APIRET;
+
+PROCEDURE DosDeleteDir
+( DirName          : ARRAY OF CHAR
+)                  : APIRET;
+
+PROCEDURE DosQueryCurrentDir
+( DriveNumber      : LONGCARD;    (* 0=current 1=A: 2=B: ... *)
+  VAR DirPath      : ARRAY OF CHAR;
+  VAR DirPathLen   : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosSetCurrentDir
+( DirName          : ARRAY OF CHAR
+)                  : APIRET;
+
+PROCEDURE DosSetDefaultDisk
+( DriveNumber      : LONGCARD     (* 1=A: 2=B: ... *)
+)                  : APIRET;
+
+PROCEDURE DosQueryCurrentDisk
+( VAR DriveNumber     : LONGCARD;
+  VAR LogicalDriveMap : LONGCARD
+)                     : APIRET;
+
+
+(*************************************************************************
+  Environment and Search Path Functions
+**************************************************************************)
+
+(* DosQueryPathInfo returning:
+     FILESTATUS3 if level 1
+     FILESTATUS4 if level 2
+     EAOP2       if level 3
+     full name   if level 5
+*)
+
+PROCEDURE DosQueryPathInfo
+( PathName          : ARRAY OF CHAR;
+  PathInfoLevel     : LONGCARD;
+  VAR PathInfoBuf   : ARRAY OF SYSTEM.BYTE;
+  PathInfoBufSize   : LONGCARD
+)                   : APIRET;
+
+PROCEDURE DosSetPathInfo
+( PathName         : ARRAY OF CHAR;
+  FileInfoLevel    : LONGCARD;  (* see DosSetFileInfo() FileInfoLevel *)
+  VAR FileInfoBuf  : ARRAY OF SYSTEM.BYTE;
+  FileInfoSize     : LONGCARD;
+  PathInfoFlags    : LONGCARD
+)                  : APIRET;
+
+
+(*************************************************************************
+  File System Driver Functions
+**************************************************************************)
+
+PROCEDURE DosFSAttach
+( DeviceName       : ARRAY OF CHAR;
+  FSDName          : SYSTEM.ADDRESS;
+  DataBuffer       : SYSTEM.ADDRESS;
+  DataBufferLen    : LONGCARD;
+  OpFlag           : LONGCARD
+)                  : APIRET;
+
+PROCEDURE DosFSCtl
+( DataArea            : ARRAY OF SYSTEM.BYTE;
+  DataLengthMax       : LONGCARD;
+  VAR DataLengthInOut : LONGCARD;
+  ParmList            : SYSTEM.ADDRESS;
+  ParmLengthMax       : LONGCARD;
+  VAR ParmLengthInOut : LONGCARD;
+  FunctionCode        : LONGCARD;
+  RouteName           : ARRAY OF CHAR;
+  FileHandle          : HFILE;
+  RouteMethod         : LONGCARD
+)                     : APIRET;
+
+PROCEDURE DosQueryFSAttach
+( DeviceName          : ARRAY OF CHAR;
+  Ordinal             : LONGCARD;
+  FSAInfoLevel        : LONGCARD;
+  VAR DataBuffer      : FSQBUFFER2;
+  VAR DataBufferLen   : LONGCARD
+)                     : APIRET;
+
+PROCEDURE DosQueryFSInfo
+( DriveNumber         : LONGCARD;
+  FSInfoLevel         : LONGCARD;
+  VAR FSInfoBuf       : ARRAY OF SYSTEM.BYTE;
+  FSInfoBufSize       : LONGCARD
+)                     : APIRET;
+
+PROCEDURE DosSetFSInfo
+( DriveNumber         : LONGCARD;
+  FSInfoLevel         : LONGCARD;
+  VAR FSInfoBuf       : ARRAY OF SYSTEM.BYTE;
+  FSInfoBufSize       : LONGCARD
+)                     : APIRET;
+
+PROCEDURE DosShutDown
+( Reserved            : LONGCARD
+)                     : APIRET;
+
+END DOSFILEMGR.

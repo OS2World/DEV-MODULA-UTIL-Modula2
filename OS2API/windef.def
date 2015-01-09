@@ -1,0 +1,207 @@
+DEFINITION MODULE WINDEF;
+
+(************************************************************************
+  OS/2 2.x/3.0 General Window Management types, constants and functions
+
+               19.02.95 23.01 : WC_... now implemented as initialized
+                                typed constant variables
+               22.02.95 21.48 : MPARAM and MRESULT are now of type LONGWORD
+               23.02.95 13.31 : MPVOID is now an initialized zero variable
+               24.08.95 12.48 : WC_... values are now string constants
+
+  Copyright (c) 1992, 1995 by Juergen Neuhoff
+*************************************************************************)
+
+(*$XL+       Modula-2 language extensions: '_' allowed for symbol names *)
+(*$CDECL+    C-style procedures                                         *)
+(*$A         default alignment for record fields                        *)
+
+IMPORT SYSTEM;
+FROM   SYSTEM  IMPORT ADDRESS, BYTE, WORD, LONGWORD;
+FROM   OS2DEF  IMPORT HWND, PSZ, PCHAR, LHANDLE;
+
+TYPE
+  PVOID    = ADDRESS;
+  MPARAM   = LONGWORD;              (* message parameter *)
+  PMPARAM  = POINTER TO MPARAM;
+  MRESULT  = LONGWORD;              (* general return value *)
+  PMRESULT = POINTER TO MRESULT;
+
+VAR
+  MPVOID   : MPARAM;   (* MPARAM initialized to zero *)
+
+
+(* function procedures to make an MPARAM from standard types. *)
+PROCEDURE MPFROMP      ( p : ADDRESS            ) : MPARAM;
+PROCEDURE MPFROMHWND   ( WinHandle : HWND       ) : MPARAM;
+PROCEDURE MPFROMCHAR   ( ch : BYTE              ) : MPARAM;
+PROCEDURE MPFROMSHORT  ( s : WORD               ) : MPARAM;
+PROCEDURE MPFROM2SHORT ( l,h : WORD             ) : MPARAM;
+PROCEDURE MPFROMSH2CH  ( l : WORD; hl,hh : BYTE ) : MPARAM;
+PROCEDURE MPFROMLONG   ( l : LONGWORD           ) : MPARAM;
+
+
+(* function procedures to extract standard types from an MPARAM *)
+PROCEDURE PVOIDFROMMP  ( mp : MPARAM            ) : ADDRESS;
+PROCEDURE HWNDFROMMP   ( mp : MPARAM            ) : HWND;
+PROCEDURE CHAR1FROMMP  ( mp : MPARAM            ) : CHAR;
+PROCEDURE CHAR2FROMMP  ( mp : MPARAM            ) : CHAR;
+PROCEDURE CHAR3FROMMP  ( mp : MPARAM            ) : CHAR;
+PROCEDURE CHAR4FROMMP  ( mp : MPARAM            ) : CHAR;
+PROCEDURE SHORT1FROMMP ( mp : MPARAM            ) : CARDINAL;
+PROCEDURE SHORT2FROMMP ( mp : MPARAM            ) : CARDINAL;
+PROCEDURE LONGFROMMP   ( mp : MPARAM            ) : LONGCARD;
+
+
+(* function procedures to make an MRESULT from standard types. *)
+PROCEDURE MRFROMP      ( p : ADDRESS            ) : MRESULT;
+PROCEDURE MRFROMSHORT  ( s : WORD               ) : MRESULT;
+PROCEDURE MRFROM2SHORT ( l,h : WORD             ) : MRESULT;
+PROCEDURE MRFROMLONG   ( l : LONGWORD           ) : MRESULT;
+
+
+(* function procedures to extract standard types from an MRESULT *)
+PROCEDURE PVOIDFROMMR  ( mr : MRESULT           ) : PVOID;
+PROCEDURE SHORT1FROMMR ( mr : MRESULT           ) : CARDINAL;
+PROCEDURE SHORT2FROMMR ( mr : MRESULT           ) : CARDINAL;
+PROCEDURE LONGFROMMR   ( mr : MRESULT           ) : LONGCARD;
+
+
+(*************************************************************************
+* This is the standard function definition for window procedures.
+* Typically they are names like "XxxxxxxxWndProc", where the prefix
+* "Xxxxxxxxx" is replaced by some name descriptive of the window procedure
+* being declared.  
+*
+* The OS/2 Developers Toolkit 2.x documentation says that
+* window procedures must be EXPORTED in the definitions
+* file used by the linker. Hence they are declared as EXPENTRY in C-language.
+* In Modula-2 this would mean that the callback function is to be introduced
+* in a Modula-2 defintion module and implemented in an implementation module.
+* Actual programming practice has shown that this restriction is not needed.
+* The callback procedure only has to be specified as (*$CDECL+*) to make
+* it compatible with OS/2 "_system" linkage convention.
+* 
+*
+*    PROCEDURE MyclassWndProc
+*    ( WinHandle : HWND;
+*      MessageId : LONGCARD;
+*      Param1    : MPARAM;
+*      Param2    : MPARAM
+*    )           : MRESULT;
+*
+*************************************************************************)
+
+
+TYPE (* Pointer to a window procedure function *)
+  PFNWP = PROCEDURE( HWND, LONGCARD, MPARAM, MPARAM ):MRESULT;
+
+
+
+CONST (* Predefined window handles *)
+  HWND_DESKTOP            =  HWND( 1 );
+  HWND_OBJECT             =  HWND( 2 );
+  HWND_TOP                =  HWND( 3 );
+  HWND_BOTTOM             =  HWND( 4 );
+  HWND_THREADCAPTURE      =  HWND( 5 );
+
+
+
+CONST (* standard window classes, e.g. for WinCreateWindow *)
+  WC_FRAME                = "#1";    (* 0001H *)
+  WC_COMBOBOX             = "#2";    (* 0002H *)
+  WC_BUTTON               = "#3";    (* 0003H *)
+  WC_MENU                 = "#4";    (* 0004H *)
+  WC_STATIC               = "#5";    (* 0005H *)
+  WC_ENTRYFIELD           = "#6";    (* 0006H *)
+  WC_LISTBOX              = "#7";    (* 0007H *)
+  WC_SCROLLBAR            = "#8";    (* 0008H *)
+  WC_TITLEBAR             = "#9";    (* 0009H *)
+  WC_MLE                  = "#10";   (* 000AH *)
+                                     (* 000BH to 000FH reserved *)
+  WC_APPSTAT              = "#16";   (* 0010H *)
+  WC_KBDSTAT              = "#17";   (* 0011H *)
+  WC_PECIC                = "#18";   (* 0012H *)
+  WC_DBE_KKPOPUP          = "#19";   (* 0013H *)
+                                     (* 0014H to 001FH reserved *)
+  WC_SPINBUTTON           = "#32";   (* 0020H *)
+                                     (* 0021H to 0024H reserved *)
+  WC_CONTAINER            = "#37";   (* 0025H *)
+  WC_SLIDER               = "#38";   (* 0026H *)
+  WC_VALUESET             = "#39";   (* 0027H *)
+  WC_NOTEBOOK             = "#40";   (* 0028H *)
+                                     (* 0029H to 0030H reserved *)
+                                     (* 0030H to 003FH reserved *)
+
+
+CONST (* Standard Window Styles *)
+  WS_VISIBLE        = 80000000H;
+  WS_DISABLED       = 40000000H;
+  WS_CLIPCHILDREN   = 20000000H;
+  WS_CLIPSIBLINGS   = 10000000H;
+  WS_PARENTCLIP     = 08000000H;
+  WS_SAVEBITS       = 04000000H;
+  WS_SYNCPAINT      = 02000000H;
+  WS_MINIMIZED      = 01000000H;
+  WS_MAXIMIZED      = 00800000H;
+  WS_ANIMATE        = 00400000H;
+
+
+CONST (* Dialog manager styles *)
+  WS_GROUP          = 00010000H;
+  WS_TABSTOP        = 00020000H;
+  WS_MULTISELECT    = 00040000H;
+
+
+CONST (* Class styles *)
+  CS_MOVENOTIFY     = 00000001H;
+  CS_SIZEREDRAW     = 00000004H;
+  CS_HITTEST        = 00000008H;
+  CS_PUBLIC         = 00000010H;
+  CS_FRAME          = 00000020H;
+  CS_CLIPCHILDREN   = 20000000H;
+  CS_CLIPSIBLINGS   = 10000000H;
+  CS_PARENTCLIP     = 08000000H;
+  CS_SAVEBITS       = 04000000H;
+  CS_SYNCPAINT      = 02000000H;
+
+
+CONST (* Extended Attribute Flags (Association Table) *)
+  EAF_DEFAULTOWNER  = 0001H;
+  EAF_UNCHANGEABLE  = 0002H;
+  EAF_REUSEICON     = 0004H;
+
+
+(* atom to pointer conversion *)
+PROCEDURE MAKEINTATOM( a:SYSTEM.LONGWORD ):PCHAR;
+
+
+CONST (* misc. definitions *)
+  STR_DLLNAME       = "keyremap";
+
+
+CONST (* DBCS window manager window message range *)
+  WM_DBCSFIRST      = 00B0H;
+  WM_DBCSLAST       = 00CFH;
+
+
+TYPE (* program handle *)
+  HPROGRAM               = LHANDLE;                 (* hprog *)
+  PHPROGRAM              = POINTER TO HPROGRAM;
+  HAPP                   = LHANDLE;
+
+
+TYPE (* ini file handle *)
+  HINI                   = LHANDLE;                 (* hini *)
+  PHINI                  = POINTER TO HINI;
+
+
+CONST
+  HINI_PROFILE           = HINI( NIL );
+  HINI_USERPROFILE       = HINI( -1 );
+  HINI_SYSTEMPROFILE     = HINI( -2 );
+  HINI_USER              = HINI_USERPROFILE;
+  HINI_SYSTEM            = HINI_SYSTEMPROFILE;
+
+
+END WINDEF.

@@ -1,0 +1,74 @@
+DEFINITION MODULE CursorMouse;
+
+(*************************************************************************
+   32-bit OS/2 Modula-2 standard cursor mouse.
+
+   Note: This definition is based upon N.Wirth's
+         "Programming in Modula-2" 4th edition;
+
+         Not yet implemented!
+
+   Copyright (c) 1995 by Juergen Neuhoff
+**************************************************************************)
+
+
+CONST
+  ML = 15;
+  MM = 14;
+  MR = 13;
+
+TYPE
+  Pattern    = RECORD
+    height     : CARDINAL;
+    raster     : ARRAY [0..15] OF BITSET;
+               END;
+
+  ReadProc   = PROCEDURE( VAR BITSET, VAR CARDINAL, VAR CARDINAL );
+
+PROCEDURE SetMouse
+(
+  x,y        : CARDINAL
+);
+
+PROCEDURE GetMouse
+(
+  VAR s      : BITSET;
+  VAR x,y    : CARDINAL
+);
+(*
+   ML IN s = "Left mouseKey pressed";
+   MM IN s = "Middel mouseKey pressed";
+   MR IN s = "Right mouseKey pressed";
+*)
+
+PROCEDURE ReadMouse
+(
+  VAR s     : BITSET;
+  VAR x,y   : CARDINAL
+);
+
+PROCEDURE Assign
+(
+  p         : ReadProc
+);
+
+PROCEDURE MoveCursor
+(
+  x,y       : CARDINAL
+);
+
+PROCEDURE EraseCursor
+();
+
+PROCEDURE SetPattern
+(
+  VAR p    : Pattern
+);
+(* set a mouse cursor pattern *)
+
+
+PROCEDURE ResetPattern
+();
+(* to standaRD arrow pattern *)
+
+END CursorMouse.

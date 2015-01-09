@@ -1,0 +1,21 @@
+LIBRARY PMGPI
+EXPORTS
+  GpiCreateLogFont             @368
+  GpiDeleteSetId               @378
+  GpiLoadFonts                 @400
+  GpiUnloadFonts               @555
+  GpiQueryFonts                @586
+  GpiQueryFontMetrics          @453
+  GpiQueryKerningPairs         @456
+  GpiQueryWidthTable           @492
+  GpiQueryNumberSetIds         @470
+  GpiQuerySetIds               @486
+  GpiQueryFaceString           @575
+  GpiQueryLogicalFont          @574
+  GpiQueryFontAction           @576
+  GpiLoadPublicFonts           @622
+  GpiUnloadPublicFonts         @623
+  GpiSetCp                     @518
+  GpiQueryCp                   @440
+  GpiQueryFontFileDescriptions @452
+  GpiQueryFullFontFileDescs    @657
